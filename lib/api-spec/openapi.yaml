@@ -1,22 +1,35 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Vijay Transmission Cost Sheet Suite API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: users
+    description: User management
+  - name: customers
+    description: Customer management
+  - name: rmPrices
+    description: Raw material prices
+  - name: quotes
+    description: Quote management
+  - name: dashboard
+    description: Dashboard analytics
+  - name: admin
+    description: Admin operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +37,626 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email (no password required)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout current session
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all allowed users (admin only)
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new allowed user (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update a user (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete a user (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /customers:
+    get:
+      operationId: listCustomers
+      tags: [customers]
+      summary: List all customers
+      responses:
+        "200":
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Customer"
+    post:
+      operationId: createCustomer
+      tags: [customers]
+      summary: Create a new customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerInput"
+      responses:
+        "201":
+          description: Customer created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  /rm-prices:
+    get:
+      operationId: getRmPrices
+      tags: [rmPrices]
+      summary: Get the latest RM prices
+      responses:
+        "200":
+          description: Latest RM prices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RmPrices"
+    post:
+      operationId: saveRmPrices
+      tags: [rmPrices]
+      summary: Save new RM prices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RmPricesInput"
+      responses:
+        "201":
+          description: RM prices saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RmPrices"
+
+  /rm-prices/history:
+    get:
+      operationId: getRmPricesHistory
+      tags: [rmPrices]
+      summary: Get RM prices history
+      responses:
+        "200":
+          description: RM prices history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RmPrices"
+
+  /rm-prices/unlock-twice-monthly:
+    post:
+      operationId: unlockTwiceMonthly
+      tags: [rmPrices]
+      summary: Admin unlock twice-monthly window
+      responses:
+        "200":
+          description: Window unlocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /quotes:
+    get:
+      operationId: listQuotes
+      tags: [quotes]
+      summary: List all quotes with optional filters
+      parameters:
+        - name: customerId
+          in: query
+          schema:
+            type: integer
+        - name: projectRef
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of quotes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Quote"
+    post:
+      operationId: createQuote
+      tags: [quotes]
+      summary: Save a new quote (auto-assigns revision number)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteInput"
+      responses:
+        "201":
+          description: Quote saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+
+  /quotes/{id}:
+    get:
+      operationId: getQuote
+      tags: [quotes]
+      summary: Get a single quote by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Quote details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+
+  /quotes/by-project:
+    get:
+      operationId: getQuotesByProject
+      tags: [quotes]
+      summary: Get all revisions for a client + project
+      parameters:
+        - name: customerId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: projectRef
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: All revisions for this project
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Quote"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get KPI summary for dashboard
+      responses:
+        "200":
+          description: Dashboard KPIs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/recent-quotes:
+    get:
+      operationId: getRecentQuotes
+      tags: [dashboard]
+      summary: Get recent quotes for activity feed
+      responses:
+        "200":
+          description: Recent quotes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Quote"
+
+  /dashboard/quotes-by-structure:
+    get:
+      operationId: getQuotesByStructure
+      tags: [dashboard]
+      summary: Quote counts grouped by structure type
+      responses:
+        "200":
+          description: Counts by structure
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StructureCount"
+
+  /dashboard/quotes-by-user:
+    get:
+      operationId: getQuotesByUser
+      tags: [dashboard]
+      summary: Quote counts grouped by user
+      responses:
+        "200":
+          description: Counts by user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserQuoteCount"
+
+  /review/projects:
+    get:
+      operationId: getProjectsByCustomer
+      tags: [quotes]
+      summary: List all project refs for a given customer
+      parameters:
+        - name: customerId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of project refs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    SuccessResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: ["string", "null"]
+
+    LoginInput:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    AuthResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+
+    User:
+      type: object
+      required: [id, email, name, role, isActive]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, user]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+
+    UserInput:
+      type: object
+      required: [email, name, role]
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, user]
+
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, user]
+        isActive:
+          type: boolean
+
+    Customer:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        createdAt:
+          type: string
+
+    CustomerInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    RmPrices:
+      type: object
+      required: [id, dailyData, twiceMonthlyData, createdAt, createdByName, isWindowUnlocked]
+      properties:
+        id:
+          type: integer
+        dailyData:
+          type: object
+          description: JSON blob of daily input values keyed by cell ref
+        twiceMonthlyData:
+          type: object
+          description: JSON blob of twice-monthly input values keyed by cell ref
+        createdAt:
+          type: string
+        createdByName:
+          type: string
+        isWindowUnlocked:
+          type: boolean
+
+    RmPricesInput:
+      type: object
+      required: [dailyData, twiceMonthlyData]
+      properties:
+        dailyData:
+          type: object
+        twiceMonthlyData:
+          type: object
+
+    Quote:
+      type: object
+      required: [id, customerId, customerName, projectRef, revision, structureType, kvOption, quotePricePerMt, totalCost, inputs, costBreakdown, generatedByName, createdAt]
+      properties:
+        id:
+          type: integer
+        customerId:
+          type: integer
+        customerName:
+          type: string
+        projectRef:
+          type: string
+        revision:
+          type: integer
+          description: Rev 0 is first quote; increments automatically per client+project
+        structureType:
+          type: string
+        kvOption:
+          type: ["string", "null"]
+        quotePricePerMt:
+          type: number
+        totalCost:
+          type: number
+        steelPrice:
+          type: ["number", "null"]
+        zincPrice:
+          type: ["number", "null"]
+        inputs:
+          type: object
+          description: Full JSON of all cost inputs
+        costBreakdown:
+          type: object
+          description: Computed cost breakdown
+        generatedByName:
+          type: string
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    QuoteInput:
+      type: object
+      required: [customerId, customerName, projectRef, structureType, quotePricePerMt, totalCost, inputs, costBreakdown, generatedByName]
+      properties:
+        customerId:
+          type: integer
+        customerName:
+          type: string
+        projectRef:
+          type: string
+        structureType:
+          type: string
+        kvOption:
+          type: ["string", "null"]
+        quotePricePerMt:
+          type: number
+        totalCost:
+          type: number
+        steelPrice:
+          type: ["number", "null"]
+        zincPrice:
+          type: ["number", "null"]
+        inputs:
+          type: object
+        costBreakdown:
+          type: object
+        generatedByName:
+          type: string
+        notes:
+          type: ["string", "null"]
+
+    DashboardSummary:
+      type: object
+      required: [totalQuotes, totalCustomers, quotesThisMonth, avgQuotePrice, totalRevisions]
+      properties:
+        totalQuotes:
+          type: integer
+        totalCustomers:
+          type: integer
+        quotesThisMonth:
+          type: integer
+        avgQuotePrice:
+          type: number
+        totalRevisions:
+          type: integer
+        topCustomer:
+          type: ["string", "null"]
+
+    StructureCount:
+      type: object
+      required: [structureType, count]
+      properties:
+        structureType:
+          type: string
+        count:
+          type: integer
+
+    UserQuoteCount:
+      type: object
+      required: [userName, count]
+      properties:
+        userName:
+          type: string
+        count:
+          type: integer
