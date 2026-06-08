@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearch } from "wouter";
 import { useListCustomers, useGetProjectsByCustomer, useGetQuotesByProject, type Quote } from "@workspace/api-client-react";
 import { getGetProjectsByCustomerQueryKey, getGetQuotesByProjectQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -150,8 +151,10 @@ function DeltaBadge({ delta }: { delta: number }) {
 }
 
 export default function Review() {
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
-  const [selectedProject, setSelectedProject] = useState<string>("");
+  const search = useSearch();
+  const initial = new URLSearchParams(search);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(initial.get("customerId") ?? "");
+  const [selectedProject, setSelectedProject] = useState<string>(initial.get("project") ?? "");
 
   const { data: customers, isLoading: loadingCustomers } = useListCustomers();
 

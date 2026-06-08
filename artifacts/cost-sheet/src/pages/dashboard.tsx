@@ -635,7 +635,11 @@ export default function Dashboard() {
             {quote.revision >= 1 && (
               <Button
                 variant="outline"
-                onClick={() => setLocation("/review")}
+                onClick={() =>
+                  setLocation(
+                    `/review?customerId=${quote.customerId}&project=${encodeURIComponent(quote.projectRef)}`
+                  )
+                }
                 className="gap-2"
                 data-testid="button-review-earlier"
               >
