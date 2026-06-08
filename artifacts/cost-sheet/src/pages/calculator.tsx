@@ -65,11 +65,14 @@ export default function Calculator() {
     { customerId: custIdNum },
     { query: { enabled: !!custIdNum, queryKey: getGetProjectsByCustomerQueryKey({ customerId: custIdNum }) } }
   );
-  const { data: existingQuotes } = useGetQuotesByProject(
+  const { data: existingQuotes, isFetching: isFetchingQuotes } = useGetQuotesByProject(
     { customerId: custIdNum, projectRef },
     { query: { enabled: !!custIdNum && !!projectRef, queryKey: ["quotes", custIdNum, projectRef] } }
   );
   const nextRevision = existingQuotes ? existingQuotes.length : 0;
+  // True while the revision lookup for the selected project is still loading,
+  // so the Step 1 skip decision isn't made on a stale (0) default.
+  const isResolvingRevision = !!custIdNum && !!projectRef && (isFetchingQuotes || !existingQuotes);
 
   // Step 2 State
   const [structureType, setStructureType] = useState("");
@@ -204,7 +207,17 @@ export default function Calculator() {
         return;
       }
     }
-    setStep(2);
+    // For a new revision (existing project), structure is inherited from Rev 0 — skip Pick Structure
+    setStep(nextRevision > 0 ? 3 : 2);
+  };
+
+  // Revision-aware back navigation: Step 2 is skipped for new revisions of existing projects
+  const goBack = () => {
+    if (step === 3 && nextRevision > 0) {
+      setStep(1);
+    } else {
+      setStep(step - 1);
+    }
   };
 
   const costBreakdown = useMemo(() => calculateCostSheet(inputs, rmPrices), [inputs, rmPrices]);
@@ -251,7 +264,7 @@ export default function Calculator() {
         </div>
         <div className="flex items-center gap-2">
           {step > 1 && (
-            <Button variant="outline" size="sm" onClick={() => setStep(step - 1)}>
+            <Button variant="outline" size="sm" onClick={goBack}>
               <ChevronLeft className="h-4 w-4 mr-1" /> Back
             </Button>
           )}
@@ -380,8 +393,8 @@ export default function Calculator() {
             </div>
 
             <div className="flex justify-end pt-4">
-              <Button onClick={handleNextFromStep1} disabled={!canProceedToStep2} className="font-bold">
-                Next: Pick Structure <ChevronRight className="h-4 w-4 ml-1" />
+              <Button onClick={handleNextFromStep1} disabled={!canProceedToStep2 || isResolvingRevision} className="font-bold">
+                {nextRevision > 0 ? "Next: Cost Buildup" : "Next: Pick Structure"} <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
           </div>
@@ -641,7 +654,7 @@ export default function Calculator() {
             </Tabs>
 
             <div className="flex justify-between pt-4 px-4 sm:px-0">
-              <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
+              <Button variant="outline" onClick={goBack}>Back</Button>
               <Button onClick={() => setStep(4)} className="font-bold">
                 Review & Save Quote <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
