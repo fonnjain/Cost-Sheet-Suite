@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@
 import { calculateCostSheet, formatINR } from "@/lib/costCalculator";
 import { ChevronRight, ChevronLeft, Check, Plus, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { SearchableSelect } from "@/components/searchable-select";
 
 const STRUCTURE_FAMILIES = [
   { group: "TLT (Towers)", items: ["TLT >800 mt", "TLT 401-800 mt", "TLT 151-400 mt", "TLT 51-150 mt", "TLT < 50 mt", "TLT Railway"] },
@@ -213,16 +214,15 @@ export default function Calculator() {
               <div className="space-y-2">
                 <Label>Customer</Label>
                 <div className="flex gap-2">
-                  <Select value={customerId} onValueChange={setCustomerId}>
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Select customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers?.map(c => (
-                        <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    options={(customers ?? []).map(c => ({ value: c.id.toString(), label: c.name }))}
+                    value={customerId}
+                    onValueChange={setCustomerId}
+                    placeholder="Search and select customer"
+                    searchPlaceholder="Type to search 842+ customers…"
+                    className="flex-1"
+                    data-testid="select-calculator-customer"
+                  />
                   <Dialog open={isNewCustomerDialogOpen} onOpenChange={setIsNewCustomerDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="outline" size="icon" title="Add New Customer">
@@ -312,7 +312,7 @@ export default function Calculator() {
                   <SelectTrigger className="border-primary/50">
                     <SelectValue placeholder="Select voltage..." />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent side="bottom">
                     {KV_OPTIONS.map(kv => (
                       <SelectItem key={kv} value={kv}>{kv}</SelectItem>
                     ))}

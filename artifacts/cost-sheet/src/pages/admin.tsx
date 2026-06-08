@@ -94,7 +94,7 @@ export default function Admin() {
                         <SelectTrigger className="w-[100px] h-8 text-xs">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent side="bottom">
                           <SelectItem value="user">User</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
                         </SelectContent>

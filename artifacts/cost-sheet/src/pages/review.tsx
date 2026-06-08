@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useListCustomers, useGetProjectsByCustomer, useGetQuotesByProject } from "@workspace/api-client-react";
+import { getGetProjectsByCustomerQueryKey, getGetQuotesByProjectQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { SearchableSelect } from "@/components/searchable-select";
 import { format } from "date-fns";
 import { formatINR } from "@/lib/costCalculator";
 
@@ -13,16 +15,16 @@ export default function Review() {
   const [selectedProject, setSelectedProject] = useState<string>("");
 
   const { data: customers, isLoading: loadingCustomers } = useListCustomers();
-  
+
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId, 10) : 0;
-  
+
   const { data: projects } = useGetProjectsByCustomer(
     { customerId },
     {
       query: {
         enabled: !!customerId,
-        queryKey: ["projects", customerId]
-      }
+        queryKey: getGetProjectsByCustomerQueryKey({ customerId }),
+      },
     }
   );
 
@@ -31,53 +33,68 @@ export default function Review() {
     {
       query: {
         enabled: !!customerId && !!selectedProject,
-        queryKey: ["quotes", customerId, selectedProject]
-      }
+        queryKey: getGetQuotesByProjectQueryKey({ customerId, projectRef: selectedProject }),
+      },
     }
   );
 
+  const customerOptions = (customers ?? []).map((c) => ({
+    value: c.id.toString(),
+    label: c.name,
+  }));
+
+  const projectOptions = (projects ?? []).map((p) => ({
+    value: p,
+    label: p,
+  }));
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Review Quotes</h1>
-          <p className="text-muted-foreground">Compare quote revisions by project</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Review Quotes</h1>
+        <p className="text-muted-foreground">Compare quote revisions by project</p>
       </div>
 
       <Card className="border-border/50">
         <CardHeader className="bg-card/50 pb-4 border-b border-border/50">
           <CardTitle className="text-lg">Select Project</CardTitle>
-          <CardDescription>Choose a customer and project reference to view history.</CardDescription>
+          <CardDescription>Choose a customer and project reference to view quote history.</CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
           <div className="grid gap-6 md:grid-cols-2 max-w-2xl">
             <div className="space-y-2">
               <Label>Customer</Label>
-              <Select value={selectedCustomerId} onValueChange={(val) => { setSelectedCustomerId(val); setSelectedProject(""); }}>
-                <SelectTrigger>
-                  <SelectValue placeholder={loadingCustomers ? "Loading..." : "Select customer"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers?.map(c => (
-                    <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={customerOptions}
+                value={selectedCustomerId}
+                onValueChange={(val) => { setSelectedCustomerId(val); setSelectedProject(""); }}
+                placeholder={loadingCustomers ? "Loading…" : "Search and select customer"}
+                searchPlaceholder="Type to search 842+ customers…"
+                data-testid="select-review-customer"
+              />
             </div>
-            
+
             <div className="space-y-2">
               <Label>Project / PO Ref</Label>
-              <Select value={selectedProject} onValueChange={setSelectedProject} disabled={!selectedCustomerId || projects?.length === 0}>
-                <SelectTrigger>
-                  <SelectValue placeholder={!selectedCustomerId ? "Select customer first" : projects?.length === 0 ? "No projects found" : "Select project"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects?.map(p => (
-                    <SelectItem key={p} value={p}>{p}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {!selectedCustomerId || !projects || projects.length === 0 ? (
+                <Select disabled>
+                  <SelectTrigger>
+                    <SelectValue placeholder={!selectedCustomerId ? "Select customer first" : "No projects found"} />
+                  </SelectTrigger>
+                  <SelectContent side="bottom">
+                    <SelectItem value="_none">—</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <SearchableSelect
+                  options={projectOptions}
+                  value={selectedProject}
+                  onValueChange={setSelectedProject}
+                  placeholder="Select project / PO ref"
+                  searchPlaceholder="Search projects…"
+                  data-testid="select-review-project"
+                />
+              )}
             </div>
           </div>
         </CardContent>
@@ -101,7 +118,7 @@ export default function Review() {
               <TableBody>
                 {loadingQuotes ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Loading quotes...</TableCell>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Loading quotes…</TableCell>
                   </TableRow>
                 ) : quotes?.length === 0 ? (
                   <TableRow>
@@ -109,7 +126,7 @@ export default function Review() {
                   </TableRow>
                 ) : (
                   quotes?.map((quote) => (
-                    <TableRow key={quote.id} className="hover:bg-accent/5">
+                    <TableRow key={quote.id} className="hover:bg-accent/5" data-testid={`row-quote-${quote.id}`}>
                       <TableCell>
                         <Badge variant="outline" className="font-mono bg-card">Rev {quote.revision}</Badge>
                       </TableCell>
@@ -121,14 +138,14 @@ export default function Review() {
                         {formatINR(quote.quotePricePerMt)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-muted-foreground">
-                        {quote.steelPrice ? formatINR(quote.steelPrice) : "-"}
+                        {quote.steelPrice ? formatINR(quote.steelPrice) : "—"}
                       </TableCell>
                       <TableCell className="text-right font-mono text-muted-foreground">
-                        {quote.zincPrice ? formatINR(quote.zincPrice) : "-"}
+                        {quote.zincPrice ? formatINR(quote.zincPrice) : "—"}
                       </TableCell>
                       <TableCell className="text-sm">{quote.generatedByName}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(quote.createdAt), 'dd MMM yyyy, HH:mm')}
+                        {format(new Date(quote.createdAt), "dd MMM yyyy, HH:mm")}
                       </TableCell>
                     </TableRow>
                   ))
