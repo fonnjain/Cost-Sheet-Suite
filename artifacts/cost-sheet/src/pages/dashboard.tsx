@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useSearch } from "wouter";
+import { useSearch, useLocation } from "wouter";
 import {
   useGetQuote,
   useListQuotes,
@@ -15,7 +15,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { formatINR } from "@/lib/costCalculator";
-import { Download, FileBarChart } from "lucide-react";
+import { Download, FileBarChart, Plus, History } from "lucide-react";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
 
@@ -253,6 +253,7 @@ function KpiCard({
 // ---- Main Component ----
 export default function Dashboard() {
   const search = useSearch();
+  const [, setLocation] = useLocation();
   const params = new URLSearchParams(search);
   const idParam = params.get("id");
   const quoteId = idParam ? parseInt(idParam, 10) : undefined;
@@ -620,6 +621,29 @@ export default function Dashboard() {
               </table>
             </CardContent>
           </Card>
+
+          {/* Bottom navigation */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <Button
+              onClick={() => setLocation("/rm-prices")}
+              className="gap-2 font-bold"
+              data-testid="button-start-new"
+            >
+              <Plus className="h-4 w-4" />
+              Start New
+            </Button>
+            {quote.revision >= 1 && (
+              <Button
+                variant="outline"
+                onClick={() => setLocation("/review")}
+                className="gap-2"
+                data-testid="button-review-earlier"
+              >
+                <History className="h-4 w-4" />
+                Review Earlier Quotes
+              </Button>
+            )}
+          </div>
         </>
       ) : (
         <EmptyState />
