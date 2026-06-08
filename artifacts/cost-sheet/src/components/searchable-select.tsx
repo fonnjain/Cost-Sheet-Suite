@@ -71,6 +71,7 @@ export function SearchableSelect({
         align="start"
         side="bottom"
         sideOffset={4}
+        avoidCollisions={false}
       >
         <div className="flex items-center border-b border-border px-3 py-2 gap-2">
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" />

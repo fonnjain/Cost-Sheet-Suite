@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 import { useGetRmPrices, useSaveRmPrices, useGetMe } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -83,6 +84,7 @@ export default function RmPrices() {
   const { data: user } = useGetMe();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [, setLocation] = useLocation();
 
   const [dailyData, setDailyData] = useState<Record<string, number>>({});
   const [twiceMonthlyData, setTwiceMonthlyData] = useState<Record<string, number>>({});
@@ -126,8 +128,9 @@ export default function RmPrices() {
   const handleSaveConfirmed = async () => {
     try {
       await saveRmPrices.mutateAsync({ data: { dailyData, twiceMonthlyData } });
-      toast({ title: "Saved", description: "RM Prices saved successfully." });
+      toast({ title: "Saved", description: "RM Prices saved. Opening Calculator…" });
       setShowVerify(false);
+      setLocation("/calculator");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save prices.";
       toast({ variant: "destructive", title: "Error", description: msg });

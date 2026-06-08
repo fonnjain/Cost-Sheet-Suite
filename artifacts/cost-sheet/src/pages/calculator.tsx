@@ -144,7 +144,7 @@ export default function Calculator() {
     try {
       const custId = parseInt(customerId, 10);
       const customerName = customers?.find((c) => c.id === custId)?.name ?? "Unknown";
-      await createQuote.mutateAsync({
+      const saved = await createQuote.mutateAsync({
         data: {
           customerId: custId,
           customerName,
@@ -161,10 +161,11 @@ export default function Calculator() {
           notes: inputs.notes
         }
       });
-      toast({ title: "Success", description: "Quote saved successfully" });
-      setLocation("/dashboard");
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Error", description: e.message });
+      toast({ title: "Success", description: "Quote saved. Opening Dashboard…" });
+      setLocation(`/dashboard?id=${saved.id}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to save quote.";
+      toast({ variant: "destructive", title: "Error", description: msg });
     }
   };
 
