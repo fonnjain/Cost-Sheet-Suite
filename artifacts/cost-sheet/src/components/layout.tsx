@@ -21,7 +21,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     },
   });
   const logout = useLogout();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   useEffect(() => {
     if (!isLoading && (isError || !user)) {
@@ -48,14 +48,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
     setLocation("/login");
   };
 
+  const NavLink = ({ href, children, testId, base }: { href: string; children: React.ReactNode; testId: string; base?: string }) => {
+    const active = location === href || location.startsWith(href + "/");
+    return (
+      <Link
+        href={href}
+        className={`text-sm font-medium transition-colors ${
+          active
+            ? "text-primary border-b-2 border-primary pb-0.5"
+            : `${base ?? "text-muted-foreground"} hover:text-primary`
+        }`}
+        data-testid={testId}
+      >
+        {children}
+      </Link>
+    );
+  };
+
   const NavLinks = () => (
     <>
-      <Link href="/rm-prices" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors" data-testid="nav-rm-prices">RM Prices</Link>
-      <Link href="/calculator" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors" data-testid="nav-calculator">Calculator</Link>
-      <Link href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors" data-testid="nav-dashboard">Dashboard</Link>
-      <Link href="/review" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors" data-testid="nav-review">Review</Link>
+      <NavLink href="/rm-prices" testId="nav-rm-prices">RM Prices</NavLink>
+      <NavLink href="/calculator" testId="nav-calculator">Calculator</NavLink>
+      <NavLink href="/dashboard" testId="nav-dashboard">Dashboard</NavLink>
+      <NavLink href="/review" testId="nav-review">Review</NavLink>
       {user.role === "admin" && (
-        <Link href="/admin" className="text-sm font-medium text-red-400 hover:text-primary transition-colors" data-testid="nav-admin">Admin</Link>
+        <NavLink href="/admin" testId="nav-admin" base="text-red-400">Admin</NavLink>
       )}
     </>
   );
