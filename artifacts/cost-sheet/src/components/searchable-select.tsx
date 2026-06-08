@@ -67,13 +67,13 @@ export function SearchableSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="p-0 w-[var(--radix-popover-trigger-width)] max-w-sm"
+        className="p-0 w-[var(--radix-popover-trigger-width)] max-w-sm flex flex-col max-h-[60vh]"
         align="start"
         side="bottom"
         sideOffset={4}
         avoidCollisions={false}
       >
-        <div className="flex items-center border-b border-border px-3 py-2 gap-2">
+        <div className="flex items-center border-b border-border px-3 py-2 gap-2 shrink-0">
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
           <input
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
@@ -83,7 +83,7 @@ export function SearchableSelect({
             autoFocus
           />
         </div>
-        <div className="max-h-60 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="py-6 text-center text-sm text-muted-foreground">No results found.</div>
           ) : (

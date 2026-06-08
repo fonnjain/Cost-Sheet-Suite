@@ -55,6 +55,7 @@ export default function Calculator() {
   const [isNewCustomerDialogOpen, setIsNewCustomerDialogOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [isNewProject, setIsNewProject] = useState(false);
+  const [prefilledFor, setPrefilledFor] = useState<string>("");
 
   // Check revisions
   const custIdNum = parseInt(customerId, 10);
@@ -129,6 +130,18 @@ export default function Calculator() {
     }
   }, [step, rmPrices]);
 
+  // When an existing project (new revision) is chosen, default Pick Structure to the Rev 0 version
+  useEffect(() => {
+    if (!projectRef || !existingQuotes || existingQuotes.length === 0) return;
+    if (prefilledFor === projectRef) return;
+    const rev0 = existingQuotes.find((q) => q.revision === 0) ?? existingQuotes[existingQuotes.length - 1];
+    if (rev0) {
+      setStructureType(rev0.structureType);
+      setKvOption(rev0.kvOption ?? "");
+      setPrefilledFor(projectRef);
+    }
+  }, [projectRef, existingQuotes, prefilledFor]);
+
   const handleInputChange = (key: string, value: string) => {
     setInputs(prev => ({ ...prev, [key]: Number(value) || 0 }));
   };
@@ -139,6 +152,17 @@ export default function Calculator() {
 
   const handleCreateCustomer = async () => {
     if (!newCustomerName) return;
+    const exists = (customers ?? []).some(
+      (c) => c.name.trim().toLowerCase() === newCustomerName.trim().toLowerCase()
+    );
+    if (exists) {
+      toast({
+        variant: "destructive",
+        title: "Customer Already Exist",
+        description: "Select from Drop down menu",
+      });
+      return;
+    }
     try {
       const res = await createCustomer.mutateAsync({ data: { name: newCustomerName } });
       await queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() });
@@ -157,6 +181,24 @@ export default function Calculator() {
     setCustomerId(val);
     setProjectRef("");
     setIsNewProject(false);
+    setPrefilledFor("");
+  };
+
+  const handleNextFromStep1 = () => {
+    if (isNewProject) {
+      const dupe = (customerProjects ?? []).some(
+        (p) => p.trim().toLowerCase() === projectRef.trim().toLowerCase()
+      );
+      if (dupe) {
+        toast({
+          variant: "destructive",
+          title: "Project Already Exist",
+          description: "Select from Drop down menu",
+        });
+        return;
+      }
+    }
+    setStep(2);
   };
 
   const costBreakdown = useMemo(() => calculateCostSheet(inputs, rmPrices), [inputs, rmPrices]);
@@ -332,7 +374,7 @@ export default function Calculator() {
             </div>
 
             <div className="flex justify-end pt-4">
-              <Button onClick={() => setStep(2)} disabled={!canProceedToStep2} className="font-bold">
+              <Button onClick={handleNextFromStep1} disabled={!canProceedToStep2} className="font-bold">
                 Next: Pick Structure <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
