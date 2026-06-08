@@ -607,7 +607,14 @@ export default function Calculator() {
                     
                     <div className="space-y-2 max-w-sm">
                       <Label>Custom Margin %</Label>
-                      <Input type="number" step="0.01" value={inputs.marginPct} onChange={(e) => handleInputChange('marginPct', e.target.value)} className="font-mono" />
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={Number((inputs.marginPct * 100).toFixed(2))}
+                        onChange={(e) => setInputs(prev => ({ ...prev, marginPct: (Number(e.target.value) || 0) / 100 }))}
+                        className="font-mono"
+                        data-testid="input-custom-margin"
+                      />
                     </div>
 
                     <div className="space-y-2">
