@@ -146,6 +146,12 @@ export default function Calculator() {
     setInputs(prev => ({ ...prev, [key]: Number(value) || 0 }));
   };
 
+  // Percentage fields are stored as decimals (0.04) but displayed/entered as whole percents (4)
+  const pctValue = (key: string) => Number(((Number(inputs[key]) || 0) * 100).toFixed(4));
+  const handlePctChange = (key: string, value: string) => {
+    setInputs(prev => ({ ...prev, [key]: (Number(value) || 0) / 100 }));
+  };
+
   const handleStringChange = (key: string, value: string) => {
     setInputs(prev => ({ ...prev, [key]: value }));
   };
@@ -472,12 +478,12 @@ export default function Calculator() {
                         <Input type="number" value={inputs.incidental} onChange={(e) => handleInputChange('incidental', e.target.value)} className="font-mono" />
                       </div>
                       <div className="space-y-2">
-                        <Label>Scrap % (e.g. 0.04)</Label>
-                        <Input type="number" step="0.001" value={inputs.scrapPct} onChange={(e) => handleInputChange('scrapPct', e.target.value)} className="font-mono" />
+                        <Label>Scrap % (e.g. 4)</Label>
+                        <Input type="number" step="0.1" value={pctValue('scrapPct')} onChange={(e) => handlePctChange('scrapPct', e.target.value)} className="font-mono" />
                       </div>
                       <div className="space-y-2">
-                        <Label>Recovery % (e.g. -0.4)</Label>
-                        <Input type="number" step="0.01" value={inputs.recoveryPct} onChange={(e) => handleInputChange('recoveryPct', e.target.value)} className="font-mono" />
+                        <Label>Recovery % (e.g. -40)</Label>
+                        <Input type="number" step="0.1" value={pctValue('recoveryPct')} onChange={(e) => handlePctChange('recoveryPct', e.target.value)} className="font-mono" />
                       </div>
                     </div>
                   </div>
@@ -515,7 +521,7 @@ export default function Calculator() {
                     <h3 className="font-bold text-lg border-b border-border/50 pb-2">Prototype</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="space-y-2"><Label>Proto Cost (₹)</Label><Input type="number" value={inputs.protoCost} onChange={(e) => handleInputChange('protoCost', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>Proto %</Label><Input type="number" step="0.01" value={inputs.protoPct} onChange={(e) => handleInputChange('protoPct', e.target.value)} className="font-mono" /></div>
+                      <div className="space-y-2"><Label>Proto %</Label><Input type="number" step="0.1" value={pctValue('protoPct')} onChange={(e) => handlePctChange('protoPct', e.target.value)} className="font-mono" /></div>
                     </div>
                   </div>
                 </TabsContent>
@@ -524,9 +530,9 @@ export default function Calculator() {
                   <div className="space-y-4">
                     <h3 className="font-bold text-lg border-b border-border/50 pb-2">Finance Costs</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="space-y-2"><Label>WIP Steel Rate %</Label><Input type="number" step="0.01" value={inputs.wipSteelRate} onChange={(e) => handleInputChange('wipSteelRate', e.target.value)} className="font-mono" /></div>
+                      <div className="space-y-2"><Label>WIP Steel Rate %</Label><Input type="number" step="0.1" value={pctValue('wipSteelRate')} onChange={(e) => handlePctChange('wipSteelRate', e.target.value)} className="font-mono" /></div>
                       <div className="space-y-2"><Label>WIP Steel Months</Label><Input type="number" step="0.1" value={inputs.wipSteelMonths} onChange={(e) => handleInputChange('wipSteelMonths', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>WIP Zinc Rate %</Label><Input type="number" step="0.01" value={inputs.wipZincRate} onChange={(e) => handleInputChange('wipZincRate', e.target.value)} className="font-mono" /></div>
+                      <div className="space-y-2"><Label>WIP Zinc Rate %</Label><Input type="number" step="0.1" value={pctValue('wipZincRate')} onChange={(e) => handlePctChange('wipZincRate', e.target.value)} className="font-mono" /></div>
                       <div className="space-y-2"><Label>WIP Zinc Months</Label><Input type="number" step="0.1" value={inputs.wipZincMonths} onChange={(e) => handleInputChange('wipZincMonths', e.target.value)} className="font-mono" /></div>
                     </div>
                   </div>
@@ -574,9 +580,9 @@ export default function Calculator() {
                           ].map(item => (
                             <TableRow key={item.id} className="border-border/50">
                               <TableCell className="font-medium text-xs sm:text-sm">{item.name}</TableCell>
-                              <TableCell className="p-2"><Input type="number" step="0.01" className="h-8 font-mono text-sm bg-background" value={inputs[`${item.id}Rate`]} onChange={(e) => handleInputChange(`${item.id}Rate`, e.target.value)} /></TableCell>
+                              <TableCell className="p-2"><Input type="number" step="0.1" className="h-8 font-mono text-sm bg-background" value={pctValue(`${item.id}Rate`)} onChange={(e) => handlePctChange(`${item.id}Rate`, e.target.value)} /></TableCell>
                               <TableCell className="p-2"><Input type="number" step="0.1" className="h-8 font-mono text-sm bg-background" value={inputs[`${item.id}Months`]} onChange={(e) => handleInputChange(`${item.id}Months`, e.target.value)} /></TableCell>
-                              <TableCell className="p-2"><Input type="number" step="0.01" className="h-8 font-mono text-sm bg-background" value={inputs[`${item.id}Pct`]} onChange={(e) => handleInputChange(`${item.id}Pct`, e.target.value)} /></TableCell>
+                              <TableCell className="p-2"><Input type="number" step="0.1" className="h-8 font-mono text-sm bg-background" value={pctValue(`${item.id}Pct`)} onChange={(e) => handlePctChange(`${item.id}Pct`, e.target.value)} /></TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -610,8 +616,8 @@ export default function Calculator() {
                       <Input
                         type="number"
                         step="0.1"
-                        value={Number((inputs.marginPct * 100).toFixed(2))}
-                        onChange={(e) => setInputs(prev => ({ ...prev, marginPct: (Number(e.target.value) || 0) / 100 }))}
+                        value={pctValue('marginPct')}
+                        onChange={(e) => handlePctChange('marginPct', e.target.value)}
                         className="font-mono"
                         data-testid="input-custom-margin"
                       />
