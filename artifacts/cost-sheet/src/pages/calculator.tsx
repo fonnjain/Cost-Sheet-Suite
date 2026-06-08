@@ -118,6 +118,11 @@ export default function Calculator() {
     notes: ""
   });
 
+  // Scroll to top whenever the wizard step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step]);
+
   // Pre-fill from RM Prices when step 3 starts
   useEffect(() => {
     if (step === 3 && rmPrices) {
