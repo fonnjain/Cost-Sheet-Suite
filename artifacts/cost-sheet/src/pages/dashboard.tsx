@@ -15,7 +15,8 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { formatINR } from "@/lib/costCalculator";
-import { Download, FileBarChart, Plus, History } from "lucide-react";
+import { Download, FileBarChart, Plus, History, FileText } from "lucide-react";
+import { exportCostSheetPdf } from "@/lib/pdfExport";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
 
@@ -295,27 +296,38 @@ export default function Dashboard() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Quote Dashboard</h1>
           {quote ? (
-            <p className="text-muted-foreground text-sm mt-0.5">
+            <div className="text-muted-foreground text-sm mt-0.5 flex flex-wrap items-center gap-x-1">
               <span className="font-medium text-foreground">{quote.structureType}</span>
               {quote.kvOption && <span className="text-muted-foreground"> ({quote.kvOption})</span>}
               {" · "}<span>{quote.customerName}</span>
               {" · "}<span className="font-mono">{quote.projectRef}</span>
               {" · "}<Badge variant="outline" className="font-mono text-xs ml-0.5">Rev {quote.revision}</Badge>
-            </p>
+            </div>
           ) : (
             <p className="text-muted-foreground text-sm">Visualise cost breakdown, margins and export the cost sheet</p>
           )}
         </div>
         {quote && cb && (
-          <Button
-            variant="outline"
-            onClick={() => exportCostSheet(quote)}
-            className="gap-2 shrink-0"
-            data-testid="button-export-excel"
-          >
-            <Download className="h-4 w-4" />
-            Export cost sheet .xlsx
-          </Button>
+          <div className="flex gap-2 shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => exportCostSheetPdf(quote)}
+              className="gap-2"
+              data-testid="button-export-pdf"
+            >
+              <FileText className="h-4 w-4" />
+              Download PDF
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => exportCostSheet(quote)}
+              className="gap-2"
+              data-testid="button-export-excel"
+            >
+              <Download className="h-4 w-4" />
+              Export .xlsx
+            </Button>
+          </div>
         )}
       </div>
 

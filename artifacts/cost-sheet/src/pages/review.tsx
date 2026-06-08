@@ -8,9 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/searchable-select";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { formatINR } from "@/lib/costCalculator";
-import { ArrowRight, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { exportRevisionReportPdf } from "@/lib/pdfExport";
+import { ArrowRight, ArrowUp, ArrowDown, Minus, FileText } from "lucide-react";
+
+// jsPDF's built-in fonts cannot render the ₹ glyph — strip it, keep Indian grouping.
+const stripRupee = (s: string) => s.replace(/₹/g, "").trim();
 
 // ---- Input label + formatting maps ----
 const CREDIT_NAMES: Record<string, string> = {
@@ -240,11 +245,83 @@ export default function Review() {
     };
   }, [sortedQuotes]);
 
+  const customerName =
+    (customers ?? []).find((c) => c.id === customerId)?.name ?? sortedQuotes[0]?.customerName ?? "Customer";
+
+  function handleDownloadPdf() {
+    if (!summary || sortedQuotes.length === 0) return;
+    const pdfVal = (key: string, v: unknown) => stripRupee(formatValue(key, v));
+
+    const meta = [
+      `Revisions: ${summary.revisions} (Rev 0 - Rev ${summary.latest.revision})`,
+      `Structure: ${summary.latest.structureType}${summary.latest.kvOption ? ` (${summary.latest.kvOption})` : ""}`,
+      `Latest (Rev ${summary.latest.revision}): Rs ${stripRupee(formatINR(summary.latest.quotePricePerMt))} /MT`,
+      `Change vs Rev 0: ${summary.totalDelta >= 0 ? "+" : "-"}Rs ${stripRupee(formatINR(Math.abs(summary.totalDelta)))} /MT`,
+    ];
+
+    const lineItemsHead = ["Line Item", ...sortedQuotes.map((q) => `Rev ${q.revision}`)];
+    const lineItemsBody: string[][] = [
+      ...lineItems.map((row) => [row.label, ...row.values.map((v) => pdfVal(row.key, v))]),
+      ["Quote Price /MT", ...sortedQuotes.map((q) => stripRupee(formatINR(q.quotePricePerMt)))],
+    ];
+    // Mirror the on-screen highlight: compare raw values to the prior revision (col 0 is the label).
+    const changedMatrix: boolean[][] = [
+      ...lineItems.map((row) => [false, ...row.values.map((v, i) => i > 0 && !numericEqual(v, row.values[i - 1]))]),
+      [false, ...sortedQuotes.map((q, i) => i > 0 && Math.abs(q.quotePricePerMt - sortedQuotes[i - 1].quotePricePerMt) >= 0.01)],
+    ];
+
+    const diffSections = diffs.map((d) => {
+      const rows: string[][] = [];
+      if (d.structureChanged) {
+        rows.push([
+          "Structure",
+          `${d.prev.structureType}${d.prev.kvOption ? ` (${d.prev.kvOption})` : ""}`,
+          `${d.quote.structureType}${d.quote.kvOption ? ` (${d.quote.kvOption})` : ""}`,
+        ]);
+      }
+      for (const c of d.changes) {
+        rows.push([c.label, pdfVal(c.key, c.from), pdfVal(c.key, c.to)]);
+      }
+      const noChange = Math.abs(d.priceDelta) < 0.01;
+      const delta = noChange
+        ? "No change"
+        : `${d.priceDelta > 0 ? "+" : "-"}Rs ${stripRupee(formatINR(Math.abs(d.priceDelta)))} /MT`;
+      return {
+        title: `Rev ${d.prev.revision} -> Rev ${d.quote.revision}  (${format(new Date(d.quote.createdAt), "dd MMM yyyy")}, ${d.quote.generatedByName})`,
+        delta,
+        rows,
+      };
+    });
+
+    exportRevisionReportPdf({
+      customerName,
+      projectRef: selectedProject,
+      meta,
+      lineItemsHead,
+      lineItemsBody,
+      changedMatrix,
+      diffSections,
+    });
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto pb-10">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Review Quotes</h1>
-        <p className="text-muted-foreground">Compare quote revisions by project</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Review Quotes</h1>
+          <p className="text-muted-foreground">Compare quote revisions by project</p>
+        </div>
+        {!!customerId && !!selectedProject && sortedQuotes.length > 0 && (
+          <Button
+            variant="outline"
+            onClick={handleDownloadPdf}
+            className="gap-2 shrink-0"
+            data-testid="button-export-review-pdf"
+          >
+            <FileText className="h-4 w-4" />
+            Download PDF
+          </Button>
+        )}
       </div>
 
       <Card className="border-border/50">

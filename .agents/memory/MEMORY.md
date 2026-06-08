@@ -1,0 +1,1 @@
+- [PDF export in cost-sheet](pdf-export.md) — jspdf+autotable from data (not html2canvas); strip ₹ before rendering; mirror UI highlights via passed-in flags.
