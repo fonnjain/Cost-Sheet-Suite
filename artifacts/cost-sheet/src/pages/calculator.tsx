@@ -6,8 +6,12 @@ import {
   useGetMe, 
   useGetRmPrices, 
   useCreateQuote,
-  useGetQuotesByProject
+  useGetQuotesByProject,
+  useGetProjectsByCustomer,
+  getListCustomersQueryKey,
+  getGetProjectsByCustomerQueryKey
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +45,7 @@ export default function Calculator() {
   const createCustomer = useCreateCustomer();
   const createQuote = useCreateQuote();
   const { data: rmPrices } = useGetRmPrices();
+  const queryClient = useQueryClient();
 
   const [step, setStep] = useState(1);
   
@@ -49,9 +54,16 @@ export default function Calculator() {
   const [projectRef, setProjectRef] = useState("");
   const [isNewCustomerDialogOpen, setIsNewCustomerDialogOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
+  const [isNewProject, setIsNewProject] = useState(false);
 
   // Check revisions
   const custIdNum = parseInt(customerId, 10);
+
+  // Existing projects for the selected customer
+  const { data: customerProjects } = useGetProjectsByCustomer(
+    { customerId: custIdNum },
+    { query: { enabled: !!custIdNum, queryKey: getGetProjectsByCustomerQueryKey({ customerId: custIdNum }) } }
+  );
   const { data: existingQuotes } = useGetQuotesByProject(
     { customerId: custIdNum, projectRef },
     { query: { enabled: !!custIdNum && !!projectRef, queryKey: ["quotes", custIdNum, projectRef] } }
@@ -129,13 +141,22 @@ export default function Calculator() {
     if (!newCustomerName) return;
     try {
       const res = await createCustomer.mutateAsync({ data: { name: newCustomerName } });
+      await queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() });
       setCustomerId(res.id.toString());
+      setProjectRef("");
+      setIsNewProject(true);
       setIsNewCustomerDialogOpen(false);
       setNewCustomerName("");
-      toast({ title: "Success", description: "Customer created" });
+      toast({ title: "Success", description: "Customer created and selected" });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     }
+  };
+
+  const handleCustomerChange = (val: string) => {
+    setCustomerId(val);
+    setProjectRef("");
+    setIsNewProject(false);
   };
 
   const costBreakdown = useMemo(() => calculateCostSheet(inputs, rmPrices), [inputs, rmPrices]);
@@ -218,7 +239,7 @@ export default function Calculator() {
                   <SearchableSelect
                     options={(customers ?? []).map(c => ({ value: c.id.toString(), label: c.name }))}
                     value={customerId}
-                    onValueChange={setCustomerId}
+                    onValueChange={handleCustomerChange}
                     placeholder="Search and select customer"
                     searchPlaceholder="Type to search 842+ customers…"
                     className="flex-1"
@@ -250,7 +271,49 @@ export default function Calculator() {
 
               <div className="space-y-2">
                 <Label>Project / PO Ref</Label>
-                <Input value={projectRef} onChange={(e) => setProjectRef(e.target.value)} placeholder="e.g. PO-2024-001" />
+                {!customerId ? (
+                  <Input value="" disabled placeholder="Select customer first" />
+                ) : isNewProject || !customerProjects || customerProjects.length === 0 ? (
+                  <div className="flex gap-2">
+                    <Input
+                      value={projectRef}
+                      onChange={(e) => setProjectRef(e.target.value)}
+                      placeholder="e.g. PO-2024-001"
+                      className="flex-1"
+                      data-testid="input-calculator-project"
+                    />
+                    {customerProjects && customerProjects.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        title="Choose existing project"
+                        onClick={() => { setIsNewProject(false); setProjectRef(""); }}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <SearchableSelect
+                      options={customerProjects.map(p => ({ value: p, label: p }))}
+                      value={projectRef}
+                      onValueChange={setProjectRef}
+                      placeholder="Select existing project"
+                      searchPlaceholder="Search projects…"
+                      className="flex-1"
+                      data-testid="select-calculator-project"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      title="Add New Project"
+                      onClick={() => { setIsNewProject(true); setProjectRef(""); }}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
