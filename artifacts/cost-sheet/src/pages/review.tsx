@@ -10,18 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/searchable-select";
 import { format } from "date-fns";
 import { formatINR } from "@/lib/costCalculator";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList,
-} from "recharts";
 import { ArrowRight, ArrowUp, ArrowDown, Minus } from "lucide-react";
-
-const PALETTE = {
-  accent: "#e63329",
-  steel: "#3d6ea5",
-  slate: "#5b708a",
-};
-
-const tooltipStyle = { backgroundColor: "#0e1f33", borderColor: "#2a3f57", color: "#aebccd" };
 
 // ---- Input label + formatting maps ----
 const CREDIT_NAMES: Record<string, string> = {
@@ -196,13 +185,29 @@ export default function Review() {
     [quotes]
   );
 
-  const trendData = useMemo(
-    () => sortedQuotes.map((q) => ({
-      rev: `Rev ${q.revision}`,
-      price: q.quotePricePerMt,
-    })),
-    [sortedQuotes]
-  );
+  const lineItems = useMemo(() => {
+    if (sortedQuotes.length === 0) return [];
+    const keySet = new Set<string>();
+    for (const q of sortedQuotes) {
+      const inp = (q.inputs ?? {}) as Record<string, unknown>;
+      for (const k of Object.keys(inp)) {
+        if (k === "notes") continue;
+        keySet.add(k);
+      }
+    }
+    const baseOrder = Object.keys(BASE_LABELS);
+    const ordered = [
+      ...baseOrder.filter((k) => keySet.has(k)),
+      ...Array.from(keySet)
+        .filter((k) => !baseOrder.includes(k))
+        .sort((a, b) => getLabel(a).localeCompare(getLabel(b))),
+    ];
+    return ordered.map((key) => ({
+      key,
+      label: getLabel(key),
+      values: sortedQuotes.map((q) => (q.inputs as Record<string, unknown> | undefined)?.[key]),
+    }));
+  }, [sortedQuotes]);
 
   const diffs = useMemo<RevisionDiff[]>(() => {
     const out: RevisionDiff[] = [];
@@ -326,48 +331,59 @@ export default function Review() {
               </div>
             )}
 
-            {/* Quote price trend */}
-            {trendData.length > 1 && (
-              <Card className="border-border/50">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-[15px]">Quote Price Across Revisions</CardTitle>
-                  <p className="text-xs text-muted-foreground">Recommended quote price per MT, by revision</p>
-                </CardHeader>
-                <CardContent className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={trendData} margin={{ top: 20, right: 16, left: 0, bottom: 4 }}>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.15} vertical={false} />
-                      <XAxis
-                        dataKey="rev"
-                        tick={{ fill: PALETTE.slate, fontFamily: "Space Mono", fontSize: 11 }}
-                        axisLine={false} tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fill: PALETTE.slate, fontFamily: "Space Mono", fontSize: 10 }}
-                        axisLine={false} tickLine={false}
-                        tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
-                      />
-                      <Tooltip
-                        contentStyle={tooltipStyle}
-                        cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                        formatter={(v: number) => [formatINR(v), "₹/MT"]}
-                      />
-                      <Bar dataKey="price" radius={[6, 6, 0, 0]} maxBarSize={56}>
-                        {trendData.map((d, i) => (
-                          <Cell key={d.rev} fill={i === trendData.length - 1 ? PALETTE.accent : PALETTE.steel} />
+            {/* Line items across revisions */}
+            <Card className="border-border/50">
+              <CardHeader className="bg-card/50 border-b border-border/50 pb-3">
+                <CardTitle className="text-[15px]">Line Items Across Revisions</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Every cost input by revision — values that changed from the prior revision are highlighted</p>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                    <TableHeader>
+                      <TableRow className="border-border/50">
+                        <TableHead className="sticky left-0 bg-card z-10 min-w-[170px]">Line Item</TableHead>
+                        {sortedQuotes.map((q) => (
+                          <TableHead key={q.id} className="text-right font-mono whitespace-nowrap min-w-[110px]">
+                            Rev {q.revision}
+                          </TableHead>
                         ))}
-                        <LabelList
-                          dataKey="price"
-                          position="top"
-                          formatter={(v: number) => formatINR(v)}
-                          style={{ fill: PALETTE.slate, fontFamily: "Space Mono", fontSize: 10 }}
-                        />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            )}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {lineItems.map((row) => (
+                        <TableRow key={row.key} className="border-border/40" data-testid={`lineitem-${row.key}`}>
+                          <TableCell className="sticky left-0 bg-card z-10 font-medium">{row.label}</TableCell>
+                          {row.values.map((v, i) => {
+                            const changed = i > 0 && !numericEqual(v, row.values[i - 1]);
+                            return (
+                              <TableCell
+                                key={i}
+                                className={`text-right font-mono whitespace-nowrap ${changed ? "text-primary font-semibold" : "text-muted-foreground"}`}
+                              >
+                                {formatValue(row.key, v)}
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      ))}
+                      <TableRow className="border-t-2 border-primary/30 bg-primary/5 hover:bg-primary/5">
+                        <TableCell className="sticky left-0 bg-card z-10 font-bold">Quote Price /MT</TableCell>
+                        {sortedQuotes.map((q, i) => {
+                          const changed = i > 0 && Math.abs(q.quotePricePerMt - sortedQuotes[i - 1].quotePricePerMt) >= 0.01;
+                          return (
+                            <TableCell
+                              key={q.id}
+                              className={`text-right font-mono font-bold whitespace-nowrap ${changed ? "text-primary" : "text-foreground"}`}
+                            >
+                              {formatINR(q.quotePricePerMt)}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
 
             {/* What changed across revisions */}
             <Card className="border-border/50">
