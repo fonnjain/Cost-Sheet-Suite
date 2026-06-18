@@ -1398,6 +1398,76 @@ export function useGetQuotesByProject<TData = Awaited<ReturnType<typeof getQuote
 
 
 
+export const getApproveQuoteUrl = (id: number,) => {
+
+
+
+
+  return `/api/quotes/${id}/approve`
+}
+
+/**
+ * @summary Mark a revision as the vendor-approved quote (clears approval on sibling revisions)
+ */
+export const approveQuote = async (id: number, options?: RequestInit): Promise<Quote> => {
+
+  return customFetch<Quote>(getApproveQuoteUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getApproveQuoteMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveQuote>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveQuote>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['approveQuote'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveQuote>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  approveQuote(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveQuoteMutationResult = NonNullable<Awaited<ReturnType<typeof approveQuote>>>
+
+    export type ApproveQuoteMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mark a revision as the vendor-approved quote (clears approval on sibling revisions)
+ */
+export const useApproveQuote = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveQuote>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveQuote>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getApproveQuoteMutationOptions(options));
+    }
+
 export const getGetDashboardSummaryUrl = () => {
 
 

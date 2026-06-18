@@ -1,1 +1,2 @@
 - [PDF export in cost-sheet](pdf-export.md) — jspdf+autotable from data (not html2canvas); strip ₹ before rendering; mirror UI highlights via passed-in flags.
+- [Quote vendor-approval invariant](quote-approval.md) — at most one approved revision per customer+project; approve in one DB transaction; validate UI selection against loaded project.

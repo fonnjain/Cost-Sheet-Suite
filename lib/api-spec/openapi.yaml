@@ -349,6 +349,25 @@ paths:
                 items:
                   $ref: "#/components/schemas/Quote"
 
+  /quotes/{id}/approve:
+    post:
+      operationId: approveQuote
+      tags: [quotes]
+      summary: Mark a revision as the vendor-approved quote (clears approval on sibling revisions)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated approved quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+
   /dashboard/summary:
     get:
       operationId: getDashboardSummary
@@ -591,6 +610,12 @@ components:
         generatedByName:
           type: string
         notes:
+          type: ["string", "null"]
+        approved:
+          type: boolean
+        approvedAt:
+          type: ["string", "null"]
+        approvedByName:
           type: ["string", "null"]
         createdAt:
           type: string

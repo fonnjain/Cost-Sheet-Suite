@@ -1,18 +1,21 @@
 import { useMemo, useState } from "react";
 import { useSearch } from "wouter";
-import { useListCustomers, useGetProjectsByCustomer, useGetQuotesByProject, type Quote } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useListCustomers, useGetProjectsByCustomer, useGetQuotesByProject, useApproveQuote, type Quote } from "@workspace/api-client-react";
 import { getGetProjectsByCustomerQueryKey, getGetQuotesByProjectQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { SearchableSelect } from "@/components/searchable-select";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { formatINR } from "@/lib/costCalculator";
 import { exportRevisionReportPdf } from "@/lib/pdfExport";
-import { ArrowRight, ArrowUp, ArrowDown, Minus, FileText } from "lucide-react";
+import { ArrowRight, ArrowUp, ArrowDown, Minus, FileText, CheckCircle2, Upload } from "lucide-react";
 
 // jsPDF's built-in fonts cannot render the ₹ glyph — strip it, keep Indian grouping.
 const stripRupee = (s: string) => s.replace(/₹/g, "").trim();
@@ -248,6 +251,45 @@ export default function Review() {
   const customerName =
     (customers ?? []).find((c) => c.id === customerId)?.name ?? sortedQuotes[0]?.customerName ?? "Customer";
 
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const approveQuote = useApproveQuote();
+
+  // Currently approved revision (if any) drives the checkbox state.
+  const approvedQuote = useMemo(() => sortedQuotes.find((q) => q.approved) ?? null, [sortedQuotes]);
+  const [selectedQuoteId, setSelectedQuoteId] = useState<number | null>(null);
+
+  // The ticked row: explicit selection wins, but only if it belongs to the loaded
+  // project — otherwise a stale selection from a prior project could be approved.
+  const checkedQuoteId = useMemo(() => {
+    if (selectedQuoteId != null && sortedQuotes.some((q) => q.id === selectedQuoteId)) {
+      return selectedQuoteId;
+    }
+    return approvedQuote?.id ?? null;
+  }, [selectedQuoteId, sortedQuotes, approvedQuote]);
+
+  async function handleApprove() {
+    if (checkedQuoteId == null) return;
+    try {
+      await approveQuote.mutateAsync({ id: checkedQuoteId });
+      await queryClient.invalidateQueries({
+        queryKey: getGetQuotesByProjectQueryKey({ customerId, projectRef: selectedProject }),
+      });
+      const rev = sortedQuotes.find((q) => q.id === checkedQuoteId)?.revision;
+      toast({ title: "Quote approved", description: `Rev ${rev} marked as the vendor-approved quote.` });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error", description: e instanceof Error ? e.message : "Failed to approve quote" });
+    }
+  }
+
+  function handleSaveToMonday() {
+    // Monday.com integration to be wired up later.
+    toast({
+      title: "Coming soon",
+      description: "Saving to Monday.com will be enabled once the integration is configured.",
+    });
+  }
+
   function handleDownloadPdf() {
     if (!summary || sortedQuotes.length === 0) return;
     const pdfVal = (key: string, v: unknown) => stripRupee(formatValue(key, v));
@@ -336,7 +378,7 @@ export default function Review() {
               <SearchableSelect
                 options={customerOptions}
                 value={selectedCustomerId}
-                onValueChange={(val) => { setSelectedCustomerId(val); setSelectedProject(""); }}
+                onValueChange={(val) => { setSelectedCustomerId(val); setSelectedProject(""); setSelectedQuoteId(null); }}
                 placeholder={loadingCustomers ? "Loading…" : "Search and select customer"}
                 searchPlaceholder="Type to search 842+ customers…"
                 data-testid="select-review-customer"
@@ -358,7 +400,7 @@ export default function Review() {
                 <SearchableSelect
                   options={projectOptions}
                   value={selectedProject}
-                  onValueChange={setSelectedProject}
+                  onValueChange={(val) => { setSelectedProject(val); setSelectedQuoteId(null); }}
                   placeholder="Select project / PO ref"
                   searchPlaceholder="Search projects…"
                   data-testid="select-review-project"
@@ -407,6 +449,111 @@ export default function Review() {
                 />
               </div>
             )}
+
+            {/* Revision summary + vendor approval */}
+            <Card className="border-border/50 overflow-hidden">
+              <CardHeader className="bg-card/50 border-b border-border/50 pb-3">
+                <CardTitle className="text-[15px]">Revision Summary</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Tick the revision finalized for the order, then mark it as the vendor-approved quote
+                </p>
+              </CardHeader>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-card/50">
+                    <TableRow className="border-border/50">
+                      <TableHead className="w-12"></TableHead>
+                      <TableHead>Rev</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Generated By</TableHead>
+                      <TableHead className="text-right">Quote Price / MT</TableHead>
+                      <TableHead className="text-right">Δ vs Prev</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedQuotes.map((q, i) => {
+                      const delta = i > 0 ? q.quotePricePerMt - sortedQuotes[i - 1].quotePricePerMt : null;
+                      const checked = checkedQuoteId === q.id;
+                      return (
+                        <TableRow
+                          key={q.id}
+                          className={`border-border/40 cursor-pointer ${checked ? "bg-primary/5" : "hover:bg-accent/5"}`}
+                          onClick={() => setSelectedQuoteId(q.id)}
+                          data-testid={`summary-row-${q.revision}`}
+                        >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(v) => setSelectedQuoteId(v ? q.id : null)}
+                              aria-label={`Select Rev ${q.revision}`}
+                              data-testid={`checkbox-rev-${q.revision}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="font-mono bg-card">Rev {q.revision}</Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                            {format(new Date(q.createdAt), "dd MMM yyyy")}
+                          </TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">{q.generatedByName}</TableCell>
+                          <TableCell className="text-right font-mono font-bold text-primary">
+                            {formatINR(q.quotePricePerMt)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {delta === null ? (
+                              <span className="text-muted-foreground">—</span>
+                            ) : Math.abs(delta) < 0.01 ? (
+                              <span className="text-muted-foreground">0</span>
+                            ) : (
+                              <span className={delta > 0 ? "text-primary" : "text-emerald-400"}>
+                                {delta > 0 ? "+" : "−"}{formatINR(Math.abs(delta))}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {q.approved ? (
+                              <Badge className="gap-1 bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/15" data-testid={`badge-approved-${q.revision}`}>
+                                <CheckCircle2 className="h-3 w-3" /> Approved
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border/50 bg-card/50 px-4 py-3">
+                {approvedQuote && (
+                  <span className="mr-auto text-xs text-muted-foreground">
+                    Approved: Rev {approvedQuote.revision}
+                    {approvedQuote.approvedByName ? ` by ${approvedQuote.approvedByName}` : ""}
+                    {approvedQuote.approvedAt ? ` on ${format(new Date(approvedQuote.approvedAt), "dd MMM yyyy")}` : ""}
+                  </span>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={handleSaveToMonday}
+                  className="gap-2"
+                  data-testid="button-save-monday"
+                >
+                  <Upload className="h-4 w-4" />
+                  Save to Monday.com
+                </Button>
+                <Button
+                  onClick={handleApprove}
+                  disabled={checkedQuoteId == null || approveQuote.isPending || checkedQuoteId === approvedQuote?.id}
+                  className="gap-2"
+                  data-testid="button-approve-quote"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  {approveQuote.isPending ? "Approving…" : "Approved Quote by Vendor"}
+                </Button>
+              </div>
+            </Card>
 
             {/* Line items across revisions */}
             <Card className="border-border/50">

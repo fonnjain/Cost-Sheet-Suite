@@ -222,6 +222,9 @@ export const ListQuotesResponseItem = zod.object({
 }).passthrough().describe('Computed cost breakdown'),
   "generatedByName": zod.string(),
   "notes": zod.string().nullish(),
+  "approved": zod.boolean().optional(),
+  "approvedAt": zod.string().nullish(),
+  "approvedByName": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListQuotesResponse = zod.array(ListQuotesResponseItem)
@@ -278,6 +281,9 @@ export const GetQuoteResponse = zod.object({
 }).passthrough().describe('Computed cost breakdown'),
   "generatedByName": zod.string(),
   "notes": zod.string().nullish(),
+  "approved": zod.boolean().optional(),
+  "approvedAt": zod.string().nullish(),
+  "approvedByName": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -310,9 +316,46 @@ export const GetQuotesByProjectResponseItem = zod.object({
 }).passthrough().describe('Computed cost breakdown'),
   "generatedByName": zod.string(),
   "notes": zod.string().nullish(),
+  "approved": zod.boolean().optional(),
+  "approvedAt": zod.string().nullish(),
+  "approvedByName": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const GetQuotesByProjectResponse = zod.array(GetQuotesByProjectResponseItem)
+
+
+/**
+ * @summary Mark a revision as the vendor-approved quote (clears approval on sibling revisions)
+ */
+export const ApproveQuoteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ApproveQuoteResponse = zod.object({
+  "id": zod.number(),
+  "customerId": zod.number(),
+  "customerName": zod.string(),
+  "projectRef": zod.string(),
+  "revision": zod.number().describe('Rev 0 is first quote; increments automatically per client+project'),
+  "structureType": zod.string(),
+  "kvOption": zod.string().nullable(),
+  "quotePricePerMt": zod.number(),
+  "totalCost": zod.number(),
+  "steelPrice": zod.number().nullish(),
+  "zincPrice": zod.number().nullish(),
+  "inputs": zod.object({
+
+}).passthrough().describe('Full JSON of all cost inputs'),
+  "costBreakdown": zod.object({
+
+}).passthrough().describe('Computed cost breakdown'),
+  "generatedByName": zod.string(),
+  "notes": zod.string().nullish(),
+  "approved": zod.boolean().optional(),
+  "approvedAt": zod.string().nullish(),
+  "approvedByName": zod.string().nullish(),
+  "createdAt": zod.string()
+})
 
 
 /**
@@ -351,6 +394,9 @@ export const GetRecentQuotesResponseItem = zod.object({
 }).passthrough().describe('Computed cost breakdown'),
   "generatedByName": zod.string(),
   "notes": zod.string().nullish(),
+  "approved": zod.boolean().optional(),
+  "approvedAt": zod.string().nullish(),
+  "approvedByName": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const GetRecentQuotesResponse = zod.array(GetRecentQuotesResponseItem)

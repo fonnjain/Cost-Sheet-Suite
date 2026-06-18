@@ -6,6 +6,7 @@ import { requireAuth } from "../middlewares/auth";
 import {
   CreateQuoteBody,
   GetQuoteParams,
+  ApproveQuoteParams,
   ListQuotesQueryParams,
   GetQuotesByProjectQueryParams,
   GetProjectsByCustomerQueryParams,
@@ -30,6 +31,9 @@ function formatQuote(q: typeof quotesTable.$inferSelect) {
     costBreakdown: q.costBreakdown,
     generatedByName: q.generatedByName,
     notes: q.notes ?? null,
+    approved: q.approved,
+    approvedAt: q.approvedAt?.toISOString() ?? null,
+    approvedByName: q.approvedByName ?? null,
     createdAt: q.createdAt?.toISOString(),
   };
 }
@@ -114,6 +118,49 @@ router.get("/quotes/by-project", requireAuth, async (req, res): Promise<void> =>
     .orderBy(desc(quotesTable.revision));
 
   res.json(quotes.map(formatQuote));
+});
+
+router.post("/quotes/:id/approve", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = ApproveQuoteParams.safeParse({ id: raw });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [target] = await db
+    .select()
+    .from(quotesTable)
+    .where(eq(quotesTable.id, params.data.id));
+
+  if (!target) {
+    res.status(404).json({ error: "Quote not found" });
+    return;
+  }
+
+  // Only one revision per (customer + project) can be the vendor-approved quote.
+  // Run both updates in a transaction so we never leave the project with no approved revision.
+  const approved = await db.transaction(async (tx) => {
+    await tx
+      .update(quotesTable)
+      .set({ approved: false, approvedAt: null, approvedByName: null })
+      .where(
+        and(
+          eq(quotesTable.customerId, target.customerId),
+          eq(quotesTable.projectRef, target.projectRef)
+        )
+      );
+
+    const [row] = await tx
+      .update(quotesTable)
+      .set({ approved: true, approvedAt: new Date(), approvedByName: req.userName ?? null })
+      .where(eq(quotesTable.id, params.data.id))
+      .returning();
+
+    return row;
+  });
+
+  res.json(formatQuote(approved));
 });
 
 router.get("/quotes/:id", requireAuth, async (req, res): Promise<void> => {

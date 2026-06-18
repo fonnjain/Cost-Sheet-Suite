@@ -31,5 +31,10 @@ export interface Quote {
   generatedByName: string;
   /** @nullable */
   notes?: string | null;
+  approved?: boolean;
+  /** @nullable */
+  approvedAt?: string | null;
+  /** @nullable */
+  approvedByName?: string | null;
   createdAt: string;
 }
