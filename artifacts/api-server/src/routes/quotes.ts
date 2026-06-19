@@ -34,6 +34,7 @@ function formatQuote(q: typeof quotesTable.$inferSelect) {
     approved: q.approved,
     approvedAt: q.approvedAt?.toISOString() ?? null,
     approvedByName: q.approvedByName ?? null,
+    legacy: q.legacy,
     createdAt: q.createdAt?.toISOString(),
   };
 }

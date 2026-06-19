@@ -21,6 +21,9 @@ export const quotesTable = pgTable("quotes", {
   approved: boolean("approved").notNull().default(false),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
   approvedByName: text("approved_by_name"),
+  // Quotes computed by the pre-reconciliation engine are flagged legacy and shown
+  // read-only with a "computed on previous logic" note. New quotes default to false.
+  legacy: boolean("legacy").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

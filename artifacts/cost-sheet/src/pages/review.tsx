@@ -53,6 +53,8 @@ const BASE_LABELS: Record<string, string> = {
   agencyComm: "Agency Commission",
   bgCost: "BG Cost",
   marginPct: "Margin %",
+  make: "Make",
+  matType: "Material Type",
   notes: "Notes",
 };
 
@@ -512,13 +514,21 @@ export default function Review() {
                             )}
                           </TableCell>
                           <TableCell>
-                            {q.approved ? (
-                              <Badge className="gap-1 bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/15" data-testid={`badge-approved-${q.revision}`}>
-                                <CheckCircle2 className="h-3 w-3" /> Approved
-                              </Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {q.approved && (
+                                <Badge className="gap-1 bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/15" data-testid={`badge-approved-${q.revision}`}>
+                                  <CheckCircle2 className="h-3 w-3" /> Approved
+                                </Badge>
+                              )}
+                              {q.legacy && (
+                                <Badge variant="outline" className="gap-1 text-amber-400 border-amber-500/40" title="Computed by the pre-reconciliation engine — read-only" data-testid={`badge-legacy-${q.revision}`}>
+                                  Legacy
+                                </Badge>
+                              )}
+                              {!q.approved && !q.legacy && (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );

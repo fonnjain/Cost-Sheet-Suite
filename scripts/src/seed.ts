@@ -15,6 +15,9 @@ const ALLOWED_USERS = [
   { email: "ai-tools@vijaytransmission.com", name: "AI Tools Admin", role: "admin" },
 ];
 
+// Values traced to INITIAL_DATA in the v6 workbook
+// (attached_assets/Vijay_Cost_Sheet_Suite-v6_1780913717806.html). Keyed by Billet
+// and Gauge cell address — these are the editable base inputs the engine overrides.
 const DEFAULT_DAILY_DATA: Record<string, number> = {
   C6: 384400,
   C9: 38511,
@@ -37,15 +40,21 @@ const DEFAULT_DAILY_DATA: Record<string, number> = {
   I80: 21500,
   I81: 21500,
   F85: 7500,
-  F91: 7500,
+  F91: 9500,
+  F93: 10500,
+  F94: 9500,
+  F96: 10500,
+  F97: 12500,
+  F98: 14500,
 };
 
 const DEFAULT_TWICE_MONTHLY_DATA: Record<string, number> = {
-  C122: 5500,
-  D122: 7000,
-  E122: 8000,
-  C125: 4000,
-  D125: 5500,
+  C12: 57500,
+  D12: 58000,
+  E12: 60000,
+  C15: 57000,
+  D15: 56575,
+  E15: 57000,
 };
 
 async function seed() {

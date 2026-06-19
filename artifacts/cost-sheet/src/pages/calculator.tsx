@@ -1,15 +1,15 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
-import { 
-  useListCustomers, 
-  useCreateCustomer, 
-  useGetMe, 
-  useGetRmPrices, 
+import {
+  useListCustomers,
+  useCreateCustomer,
+  useGetMe,
+  useGetRmPrices,
   useCreateQuote,
   useGetQuotesByProject,
   useGetProjectsByCustomer,
   getListCustomersQueryKey,
-  getGetProjectsByCustomerQueryKey
+  getGetProjectsByCustomerQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -21,25 +21,68 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
-import { calculateCostSheet, formatINR } from "@/lib/costCalculator";
+import { formatINR } from "@/lib/costCalculator";
+import { buildRMData, calculateCostSheet, buildDefaultInputs, getDistinctMakes, MASTER_SPECS } from "@/lib/v6/engine";
+import { toLegacyShape } from "@/lib/v6/legacy";
 import { ChevronRight, ChevronLeft, Check, Plus, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SearchableSelect } from "@/components/searchable-select";
 
-const STRUCTURE_FAMILIES = [
-  { group: "TLT (Towers)", items: ["TLT >800 mt", "TLT 401-800 mt", "TLT 151-400 mt", "TLT 51-150 mt", "TLT < 50 mt", "TLT Railway"] },
-  { group: "Sub-Station", items: ["Sub-Station (L) 401-800 mt", "Sub Station (L) - 151-400 mt", "Sub Station (L) < 150 mt", "Sub-Station (P)", "Sub-Station (P2)", "out source < 150 mt"] },
-  { group: "Poles", items: ["Swaged Pole", "Stepped Pole", "Monopole 50-150 mt", "Monopole < 50 mt"] },
-  { group: "Railway", items: ["Railway OHE", "Railway OHE (Heavy)", "Railway Bridge"] },
-  { group: "Hardware & Other", items: ["Transmission Hardware", "Distribution Hardware", "Earthing Hardware", "Clamps & Connectors", "GI Wire", "Conductor", "Cable Tray", "Misc"] },
+// Phase 1 scope: TLT (3 bands) + Sub-Station (L) (3 bands) + out-source <150.
+// Names trace exactly to MASTER_SPECS keys in the v6 workbook (all `tlt5` schema).
+const PHASE1_FAMILIES: { group: string; items: string[] }[] = [
+  {
+    group: "Transmission Line Towers (TLT)",
+    items: ["TLT >800 mt", "TLT 401-800 mt", "TLT 151 - 400 mt "],
+  },
+  {
+    group: "Sub-Station (Lattice)",
+    items: ["Sub-Station (L) >800 mt ", "Sub-Station (L) 401- 800 mt", "Sub Station (L) - 151 - 400 mt "],
+  },
+  {
+    group: "Outsourced TLT",
+    items: ["out source < 150 mt "],
+  },
 ];
 
-const KV_OPTIONS = ["11kV", "33kV", "66kV", "132kV", "220kV", "400kV", "765kV"];
+// Build-up field metadata, keyed by v6 input names.
+const CONVERSION_FIELDS: { key: string; label: string }[] = [
+  { key: "fab_labor", label: "Fabrication — Labour" },
+  { key: "weld_cons", label: "Welding & Consumables" },
+  { key: "galv_fl", label: "Galvanising — Fuel & Labour" },
+  { key: "pack_strn", label: "Packing & Straightening" },
+  { key: "load_unload", label: "Loading & Unloading" },
+  { key: "handover", label: "Handing Over Charge" },
+  { key: "others_conv", label: "Others" },
+];
+
+const CONTINGENCY_FIELDS: { key: string; label: string }[] = [
+  { key: "inspect_ins", label: "Inspection & Insurance" },
+  { key: "sp_packing", label: "Special Packing" },
+  { key: "freight_out", label: "Freight Outward" },
+  { key: "third_party", label: "Third Party Testing" },
+  { key: "agency_comm", label: "Agency Commission" },
+  { key: "bg_cost", label: "BG Cost" },
+];
+
+const CREDIT_COMPONENTS: { id: string; name: string }[] = [
+  { id: "open_p", name: "Open PO" },
+  { id: "open_f", name: "Open Final" },
+  { id: "emd", name: "EMD" },
+  { id: "lc", name: "LC" },
+  { id: "vfs", name: "VFS" },
+  { id: "abg", name: "ABG" },
+  { id: "pbg", name: "PBG" },
+  { id: "cpbg", name: "CPBG" },
+  { id: "adv", name: "Advance" },
+];
+
+const MATERIAL_TYPES = ["MS", "HT"];
 
 export default function Calculator() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  
+
   const { data: user } = useGetMe();
   const { data: customers } = useListCustomers();
   const createCustomer = useCreateCustomer();
@@ -48,7 +91,7 @@ export default function Calculator() {
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState(1);
-  
+
   // Step 1 State
   const [customerId, setCustomerId] = useState<string>("");
   const [projectRef, setProjectRef] = useState("");
@@ -57,10 +100,8 @@ export default function Calculator() {
   const [isNewProject, setIsNewProject] = useState(false);
   const [prefilledFor, setPrefilledFor] = useState<string>("");
 
-  // Check revisions
   const custIdNum = parseInt(customerId, 10);
 
-  // Existing projects for the selected customer
   const { data: customerProjects } = useGetProjectsByCustomer(
     { customerId: custIdNum },
     { query: { enabled: !!custIdNum, queryKey: getGetProjectsByCustomerQueryKey({ customerId: custIdNum }) } }
@@ -70,98 +111,75 @@ export default function Calculator() {
     { query: { enabled: !!custIdNum && !!projectRef, queryKey: ["quotes", custIdNum, projectRef] } }
   );
   const nextRevision = existingQuotes ? existingQuotes.length : 0;
-  // True while the revision lookup for the selected project is still loading,
-  // so the Step 1 skip decision isn't made on a stale (0) default.
   const isResolvingRevision = !!custIdNum && !!projectRef && (isFetchingQuotes || !existingQuotes);
 
   // Step 2 State
   const [structureType, setStructureType] = useState("");
   const [kvOption, setKvOption] = useState("");
 
-  // Step 3 State (Inputs)
-  const [inputs, setInputs] = useState<Record<string, any>>({
-    steelBasePrice: 0,
-    incidental: 0,
-    scrapPct: 0.04,
-    recoveryPct: -0.4,
-    zincPrice: 384400,
-    zincMicron: 0.045,
-    fabLabor: 0,
-    weldCons: 0,
-    galvFl: 0,
-    packStrn: 0,
-    loadUnload: 0,
-    handover: 0,
-    others: 0,
-    protoCost: 0,
-    protoPct: 0,
-    wipSteelRate: 0.09,
-    wipSteelMonths: 2,
-    wipZincRate: 0.09,
-    wipZincMonths: 1,
-    inspectIns: 0,
-    spPacking: 0,
-    freightOut: 0,
-    thirdParty: 0,
-    agencyComm: 0,
-    bgCost: 0,
-    openPoRate: 0.09, openPoMonths: 0, openPoPct: 0,
-    finalPaymentRate: 0.09, finalPaymentMonths: 0, finalPaymentPct: 0,
-    emdRate: 0.09, emdMonths: 0, emdPct: 0,
-    lcRate: 0.09, lcMonths: 0, lcPct: 0,
-    vfsRate: 0.09, vfsMonths: 0, vfsPct: 0,
-    abgRate: 0.09, abgMonths: 0, abgPct: 0,
-    pbgRate: 0.09, pbgMonths: 0, pbgPct: 0,
-    cpbgRate: 0.09, cpbgMonths: 0, cpbgPct: 0,
-    advanceRate: 0.09, advanceMonths: 0, advancePct: 0,
-    marginPct: 0.05,
-    notes: ""
-  });
+  // RM data derived from the saved console values, evaluated through the v6 engine.
+  const rm = useMemo(
+    () =>
+      buildRMData({
+        ...((rmPrices?.dailyData as Record<string, number>) ?? {}),
+        ...((rmPrices?.twiceMonthlyData as Record<string, number>) ?? {}),
+      }),
+    [rmPrices]
+  );
+  const makeOptions = useMemo(() => {
+    const makes = getDistinctMakes(rm);
+    return makes.includes("PG/NTPC") ? makes : ["PG/NTPC", ...makes];
+  }, [rm]);
 
-  // Scroll to top whenever the wizard step changes
+  const spec = structureType ? (MASTER_SPECS as Record<string, any>)[structureType] : null;
+
+  // Step 3 State (v6 input keys)
+  const [inputs, setInputs] = useState<Record<string, any>>({});
+  const [selectedMarginIdx, setSelectedMarginIdx] = useState(0);
+  const [notes, setNotes] = useState("");
+  // Track which spec the inputs were built for, so we rebuild defaults on change.
+  const [inputsForSpec, setInputsForSpec] = useState<string>("");
+
+  // Build default inputs whenever the chosen structure changes.
+  useEffect(() => {
+    if (!spec || !structureType) return;
+    if (inputsForSpec === structureType) return;
+    const defaults = buildDefaultInputs(spec, rm);
+    if (kvOption) defaults.kv = kvOption;
+    setInputs(defaults);
+    setKvOption(defaults.kv ?? "");
+    setSelectedMarginIdx(0);
+    setInputsForSpec(structureType);
+  }, [spec, structureType, rm, kvOption, inputsForSpec]);
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [step]);
 
-  // Pre-fill from RM Prices when step 3 starts
-  useEffect(() => {
-    if (step === 3 && rmPrices) {
-      // Just a simple default mapping, in reality this would be more complex based on structure type
-      const defaultSteel = (rmPrices.dailyData as any)?.['C9'] || 0;
-      const defaultZinc = (rmPrices.dailyData as any)?.['C6'] || 384400;
-      
-      setInputs(prev => ({
-        ...prev,
-        steelBasePrice: prev.steelBasePrice || defaultSteel,
-        zincPrice: prev.zincPrice === 384400 ? defaultZinc : prev.zincPrice
-      }));
-    }
-  }, [step, rmPrices]);
-
-  // When an existing project (new revision) is chosen, default Pick Structure to the Rev 0 version
+  // When an existing project (new revision) is chosen, default to the Rev 0 structure + kV.
   useEffect(() => {
     if (!projectRef || !existingQuotes || existingQuotes.length === 0) return;
     if (prefilledFor === projectRef) return;
     const rev0 = existingQuotes.find((q) => q.revision === 0) ?? existingQuotes[existingQuotes.length - 1];
-    if (rev0) {
+    if (rev0 && (MASTER_SPECS as Record<string, any>)[rev0.structureType]) {
       setStructureType(rev0.structureType);
       setKvOption(rev0.kvOption ?? "");
+      setInputsForSpec("");
       setPrefilledFor(projectRef);
     }
   }, [projectRef, existingQuotes, prefilledFor]);
 
-  const handleInputChange = (key: string, value: string) => {
-    setInputs(prev => ({ ...prev, [key]: Number(value) || 0 }));
+  const handleNum = (key: string, value: string) => {
+    setInputs((prev) => ({ ...prev, [key]: Number(value) || 0 }));
   };
-
-  // Percentage fields are stored as decimals (0.04) but displayed/entered as whole percents (4)
+  // Percent fields stored as decimals (0.04) but entered as whole percents (4).
   const pctValue = (key: string) => Number(((Number(inputs[key]) || 0) * 100).toFixed(4));
-  const handlePctChange = (key: string, value: string) => {
-    setInputs(prev => ({ ...prev, [key]: (Number(value) || 0) / 100 }));
+  const handlePct = (key: string, value: string) => {
+    setInputs((prev) => ({ ...prev, [key]: (Number(value) || 0) / 100 }));
   };
-
-  const handleStringChange = (key: string, value: string) => {
-    setInputs(prev => ({ ...prev, [key]: value }));
+  const handleStr = (key: string, value: string) => {
+    setInputs((prev) => ({ ...prev, [key]: value }));
+    if (key === "kv") setKvOption(value);
   };
 
   const handleCreateCustomer = async () => {
@@ -170,11 +188,7 @@ export default function Calculator() {
       (c) => c.name.trim().toLowerCase() === newCustomerName.trim().toLowerCase()
     );
     if (exists) {
-      toast({
-        variant: "destructive",
-        title: "Customer Already Exist",
-        description: "Select from Drop down menu",
-      });
+      toast({ variant: "destructive", title: "Customer Already Exist", description: "Select from Drop down menu" });
       return;
     }
     try {
@@ -204,33 +218,36 @@ export default function Calculator() {
         (p) => p.trim().toLowerCase() === projectRef.trim().toLowerCase()
       );
       if (dupe) {
-        toast({
-          variant: "destructive",
-          title: "Project Already Exist",
-          description: "Select from Drop down menu",
-        });
+        toast({ variant: "destructive", title: "Project Already Exist", description: "Select from Drop down menu" });
         return;
       }
     }
-    // For a new revision (existing project), structure is inherited from Rev 0 — skip Pick Structure
     setStep(nextRevision > 0 ? 3 : 2);
   };
 
-  // Revision-aware back navigation: Step 2 is skipped for new revisions of existing projects
   const goBack = () => {
-    if (step === 3 && nextRevision > 0) {
-      setStep(1);
-    } else {
-      setStep(step - 1);
-    }
+    if (step === 3 && nextRevision > 0) setStep(1);
+    else setStep(step - 1);
   };
 
-  const costBreakdown = useMemo(() => calculateCostSheet(inputs, rmPrices), [inputs, rmPrices]);
+  const results = useMemo(() => {
+    if (!spec || !inputs.kv) return null;
+    try {
+      return calculateCostSheet(rm, spec, inputs);
+    } catch {
+      return null;
+    }
+  }, [rm, spec, inputs]);
+
+  const quotePrice = results?.margins[selectedMarginIdx]?.quote ?? 0;
 
   const handleSaveQuote = async () => {
+    if (!spec || !results) return;
     try {
       const custId = parseInt(customerId, 10);
       const customerName = customers?.find((c) => c.id === custId)?.name ?? "Unknown";
+      const { legacyInputs, legacyCostBreakdown } = toLegacyShape(inputs, results, selectedMarginIdx);
+      legacyInputs.notes = notes;
       const saved = await createQuote.mutateAsync({
         data: {
           customerId: custId,
@@ -238,15 +255,15 @@ export default function Calculator() {
           projectRef,
           structureType,
           kvOption: kvOption || null,
-          quotePricePerMt: costBreakdown.quotePrice,
-          totalCost: costBreakdown.totalBeforeMargin,
-          steelPrice: inputs.steelBasePrice,
-          zincPrice: inputs.zincPrice,
-          inputs,
-          costBreakdown,
+          quotePricePerMt: results.margins[selectedMarginIdx].quote,
+          totalCost: results.total,
+          steelPrice: results.rmPrice,
+          zincPrice: Number(inputs.zinc_price) || 0,
+          inputs: legacyInputs,
+          costBreakdown: legacyCostBreakdown,
           generatedByName: user?.name || "Unknown",
-          notes: inputs.notes
-        }
+          notes,
+        },
       });
       toast({ title: "Success", description: "Quote saved. Opening Dashboard…" });
       setLocation(`/dashboard?id=${saved.id}`);
@@ -257,8 +274,7 @@ export default function Calculator() {
   };
 
   const canProceedToStep2 = customerId && projectRef;
-  const canProceedToStep3 = structureType && (!structureType.includes("Sub-Station") || kvOption);
-  const canProceedToStep4 = true; // Add specific validation if needed
+  const canProceedToStep3 = !!structureType && !!inputs.kv;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto pb-20">
@@ -279,10 +295,9 @@ export default function Calculator() {
       <div className="flex items-center justify-between mb-8 relative">
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-muted -z-10 rounded"></div>
         <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary -z-10 rounded transition-all duration-300" style={{ width: `${((step - 1) / 3) * 100}%` }}></div>
-        
-        {[1, 2, 3, 4].map(s => (
+        {[1, 2, 3, 4].map((s) => (
           <div key={s} className={`flex flex-col items-center justify-center w-10 h-10 rounded-full border-2 text-sm font-bold transition-colors ${
-            step === s ? "bg-primary border-primary text-primary-foreground" : 
+            step === s ? "bg-primary border-primary text-primary-foreground" :
             step > s ? "bg-primary border-primary text-primary-foreground" : "bg-card border-muted-foreground/30 text-muted-foreground"
           }`}>
             {step > s ? <Check className="h-5 w-5" /> : s}
@@ -297,13 +312,13 @@ export default function Calculator() {
               <h2 className="text-xl font-bold mb-2">Step 1: Project Details</h2>
               <p className="text-sm text-muted-foreground">Select a customer and enter the project reference.</p>
             </div>
-            
+
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Customer</Label>
                 <div className="flex gap-2">
                   <SearchableSelect
-                    options={(customers ?? []).map(c => ({ value: c.id.toString(), label: c.name }))}
+                    options={(customers ?? []).map((c) => ({ value: c.id.toString(), label: c.name }))}
                     value={customerId}
                     onValueChange={handleCustomerChange}
                     placeholder="Search and select customer"
@@ -349,12 +364,7 @@ export default function Calculator() {
                       data-testid="input-calculator-project"
                     />
                     {customerProjects && customerProjects.length > 0 && (
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        title="Choose existing project"
-                        onClick={() => { setIsNewProject(false); setProjectRef(""); }}
-                      >
+                      <Button variant="outline" size="icon" title="Choose existing project" onClick={() => { setIsNewProject(false); setProjectRef(""); }}>
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
                     )}
@@ -362,7 +372,7 @@ export default function Calculator() {
                 ) : (
                   <div className="flex gap-2">
                     <SearchableSelect
-                      options={customerProjects.map(p => ({ value: p, label: p }))}
+                      options={customerProjects.map((p) => ({ value: p, label: p }))}
                       value={projectRef}
                       onValueChange={setProjectRef}
                       placeholder="Select existing project"
@@ -370,12 +380,7 @@ export default function Calculator() {
                       className="flex-1"
                       data-testid="select-calculator-project"
                     />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      title="Add New Project"
-                      onClick={() => { setIsNewProject(true); setProjectRef(""); }}
-                    >
+                    <Button variant="outline" size="icon" title="Add New Project" onClick={() => { setIsNewProject(true); setProjectRef(""); }}>
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
@@ -386,7 +391,7 @@ export default function Calculator() {
                 <Label>Generated By</Label>
                 <Input value={user?.name || ""} disabled className="bg-muted/50" />
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Revision</Label>
                 <div className="h-10 flex items-center">
@@ -409,24 +414,25 @@ export default function Calculator() {
           <div className="p-6 md:p-8 space-y-8 animate-in slide-in-from-right-4 duration-300">
             <div>
               <h2 className="text-xl font-bold mb-2">Step 2: Pick Structure</h2>
-              <p className="text-sm text-muted-foreground">Select the type of structure for this quote.</p>
+              <p className="text-sm text-muted-foreground">Select the structure, then the voltage class, make and material grade.</p>
             </div>
-            
+
             <div className="space-y-8">
-              {STRUCTURE_FAMILIES.map(family => (
+              {PHASE1_FAMILIES.map((family) => (
                 <div key={family.group} className="space-y-3">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">
                     {family.group}
                   </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {family.items.map(item => (
-                      <Card 
-                        key={item} 
-                        className={`cursor-pointer transition-all border ${structureType === item ? 'border-primary ring-1 ring-primary bg-primary/5' : 'border-border/50 hover:border-primary/50 bg-card/50'}`}
-                        onClick={() => setStructureType(item)}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {family.items.map((item) => (
+                      <Card
+                        key={item}
+                        className={`cursor-pointer transition-all border ${structureType === item ? "border-primary ring-1 ring-primary bg-primary/5" : "border-border/50 hover:border-primary/50 bg-card/50"}`}
+                        onClick={() => { setStructureType(item); setInputsForSpec(""); setKvOption(""); }}
+                        data-testid={`card-structure-${item.trim().replace(/\s+/g, "-")}`}
                       >
                         <CardContent className="p-4 flex items-center justify-center text-center min-h-[80px]">
-                          <span className="text-sm font-medium leading-tight">{item}</span>
+                          <span className="text-sm font-medium leading-tight">{item.trim()}</span>
                         </CardContent>
                       </Card>
                     ))}
@@ -435,19 +441,41 @@ export default function Calculator() {
               ))}
             </div>
 
-            {structureType.includes("Sub-Station") && (
-              <div className="pt-6 border-t border-border/50 space-y-4 max-w-sm animate-in fade-in zoom-in duration-300">
-                <Label className="text-primary font-bold">Requires kV Option</Label>
-                <Select value={kvOption} onValueChange={setKvOption}>
-                  <SelectTrigger className="border-primary/50">
-                    <SelectValue placeholder="Select voltage..." />
-                  </SelectTrigger>
-                  <SelectContent side="bottom">
-                    {KV_OPTIONS.map(kv => (
-                      <SelectItem key={kv} value={kv}>{kv}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {spec && (
+              <div className="pt-6 border-t border-border/50 grid gap-4 sm:grid-cols-3 animate-in fade-in zoom-in duration-300">
+                <div className="space-y-2">
+                  <Label className="text-primary font-bold">Voltage class (kV)</Label>
+                  <Select value={inputs.kv ?? ""} onValueChange={(v) => handleStr("kv", v)}>
+                    <SelectTrigger className="border-primary/50" data-testid="select-kv"><SelectValue placeholder="Select voltage…" /></SelectTrigger>
+                    <SelectContent side="bottom">
+                      {spec.ratios.kv_options.map((o: any) => (
+                        <SelectItem key={o.kv} value={o.kv}>{o.kv}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Make</Label>
+                  <Select value={inputs.make ?? ""} onValueChange={(v) => handleStr("make", v)}>
+                    <SelectTrigger data-testid="select-make"><SelectValue placeholder="Select make…" /></SelectTrigger>
+                    <SelectContent side="bottom">
+                      {makeOptions.map((m) => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Material type</Label>
+                  <Select value={inputs.matType ?? "MS"} onValueChange={(v) => handleStr("matType", v)}>
+                    <SelectTrigger data-testid="select-mat-type"><SelectValue /></SelectTrigger>
+                    <SelectContent side="bottom">
+                      {MATERIAL_TYPES.map((m) => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             )}
 
@@ -465,9 +493,9 @@ export default function Calculator() {
             <div className="px-4 sm:px-0">
               <h2 className="text-xl font-bold mb-2">Step 3: Cost Buildup</h2>
               <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">{customers?.find(c => c.id.toString() === customerId)?.name}</span> • 
-                <span className="font-mono">{projectRef}</span> • 
-                <span>{structureType} {kvOption ? `(${kvOption})` : ''}</span>
+                <span className="font-medium text-foreground">{customers?.find((c) => c.id.toString() === customerId)?.name}</span> •
+                <span className="font-mono">{projectRef}</span> •
+                <span>{structureType.trim()} {kvOption ? `(${kvOption})` : ""}</span>
               </div>
             </div>
 
@@ -485,23 +513,32 @@ export default function Calculator() {
               <div className="p-4 sm:p-0 mt-4">
                 <TabsContent value="materials" className="space-y-8 focus-visible:outline-none">
                   <div className="space-y-4">
-                    <h3 className="font-bold text-lg border-b border-border/50 pb-2">Steel & Materials</h3>
+                    <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                      <h3 className="font-bold text-lg">Raw Material (per MT)</h3>
+                      <span className="font-mono text-sm text-primary" data-testid="text-rm-price">RM/MT: {formatINR(results?.rmPrice ?? 0)}</span>
+                    </div>
+                    {results && results.rmCalc.breakdown.length > 0 && (
+                      <div className="bg-muted/20 rounded-lg p-3 text-xs font-mono text-muted-foreground space-y-1">
+                        {results.rmCalc.breakdown.map((b, idx) => (
+                          <div key={idx} className="flex justify-between gap-4">
+                            <span>{b.category} × {(b.ratio * 100).toFixed(1)}%</span>
+                            <span>{b.price != null ? formatINR(b.price) : "—"} → {formatINR(b.contrib)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="space-y-2">
-                        <Label>Steel Base Price (₹/mt)</Label>
-                        <Input type="number" value={inputs.steelBasePrice} onChange={(e) => handleInputChange('steelBasePrice', e.target.value)} className="font-mono" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Incidental Charges (₹/mt)</Label>
-                        <Input type="number" value={inputs.incidental} onChange={(e) => handleInputChange('incidental', e.target.value)} className="font-mono" />
+                        <Label>Incidental Charges (₹/MT)</Label>
+                        <Input type="number" value={inputs.incidental ?? 0} onChange={(e) => handleNum("incidental", e.target.value)} className="font-mono" data-testid="input-incidental" />
                       </div>
                       <div className="space-y-2">
                         <Label>Scrap % (e.g. 4)</Label>
-                        <Input type="number" step="0.1" value={pctValue('scrapPct')} onChange={(e) => handlePctChange('scrapPct', e.target.value)} className="font-mono" />
+                        <Input type="number" step="0.1" value={pctValue("scrap_pct")} onChange={(e) => handlePct("scrap_pct", e.target.value)} className="font-mono" data-testid="input-scrap" />
                       </div>
                       <div className="space-y-2">
                         <Label>Recovery % (e.g. -40)</Label>
-                        <Input type="number" step="0.1" value={pctValue('recoveryPct')} onChange={(e) => handlePctChange('recoveryPct', e.target.value)} className="font-mono" />
+                        <Input type="number" step="0.1" value={pctValue("recovery_pct")} onChange={(e) => handlePct("recovery_pct", e.target.value)} className="font-mono" data-testid="input-recovery" />
                       </div>
                     </div>
                   </div>
@@ -510,12 +547,12 @@ export default function Calculator() {
                     <h3 className="font-bold text-lg border-b border-border/50 pb-2">Zinc / Galvanising</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="space-y-2">
-                        <Label>Zinc Price (₹/mt)</Label>
-                        <Input type="number" value={inputs.zincPrice} onChange={(e) => handleInputChange('zincPrice', e.target.value)} className="font-mono" />
+                        <Label>Zinc RM Price (₹/MT)</Label>
+                        <Input type="number" value={inputs.zinc_price ?? 0} onChange={(e) => handleNum("zinc_price", e.target.value)} className="font-mono" data-testid="input-zinc-price" />
                       </div>
                       <div className="space-y-2">
-                        <Label>Micron Factor (e.g. 0.045)</Label>
-                        <Input type="number" step="0.001" value={inputs.zincMicron} onChange={(e) => handleInputChange('zincMicron', e.target.value)} className="font-mono" />
+                        <Label>Zinc Micron (e.g. 0.045)</Label>
+                        <Input type="number" step="0.001" value={inputs.zincMicron ?? 0} onChange={(e) => handleNum("zincMicron", e.target.value)} className="font-mono" data-testid="input-zinc-micron" />
                       </div>
                     </div>
                   </div>
@@ -523,23 +560,22 @@ export default function Calculator() {
 
                 <TabsContent value="conversion" className="space-y-8 focus-visible:outline-none">
                   <div className="space-y-4">
-                    <h3 className="font-bold text-lg border-b border-border/50 pb-2">Conversion Costs (₹/mt)</h3>
+                    <h3 className="font-bold text-lg border-b border-border/50 pb-2">Conversion Costs (₹/MT)</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="space-y-2"><Label>Fabrication Labor</Label><Input type="number" value={inputs.fabLabor} onChange={(e) => handleInputChange('fabLabor', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>Welding Consumables</Label><Input type="number" value={inputs.weldCons} onChange={(e) => handleInputChange('weldCons', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>Galvanising Charges</Label><Input type="number" value={inputs.galvFl} onChange={(e) => handleInputChange('galvFl', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>Packing & Strapping</Label><Input type="number" value={inputs.packStrn} onChange={(e) => handleInputChange('packStrn', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>Loading/Unloading</Label><Input type="number" value={inputs.loadUnload} onChange={(e) => handleInputChange('loadUnload', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>Handover Charges</Label><Input type="number" value={inputs.handover} onChange={(e) => handleInputChange('handover', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>Others</Label><Input type="number" value={inputs.others} onChange={(e) => handleInputChange('others', e.target.value)} className="font-mono" /></div>
+                      {CONVERSION_FIELDS.map((f) => (
+                        <div key={f.key} className="space-y-2">
+                          <Label>{f.label}</Label>
+                          <Input type="number" value={inputs[f.key] ?? 0} onChange={(e) => handleNum(f.key, e.target.value)} className="font-mono" data-testid={`input-${f.key}`} />
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  
+
                   <div className="space-y-4">
                     <h3 className="font-bold text-lg border-b border-border/50 pb-2">Prototype</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="space-y-2"><Label>Proto Cost (₹)</Label><Input type="number" value={inputs.protoCost} onChange={(e) => handleInputChange('protoCost', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>Proto %</Label><Input type="number" step="0.1" value={pctValue('protoPct')} onChange={(e) => handlePctChange('protoPct', e.target.value)} className="font-mono" /></div>
+                      <div className="space-y-2"><Label>Proto Cost (₹/MT)</Label><Input type="number" value={inputs.proto_cost ?? 0} onChange={(e) => handleNum("proto_cost", e.target.value)} className="font-mono" data-testid="input-proto-cost" /></div>
+                      <div className="space-y-2"><Label>Amortisation %</Label><Input type="number" step="0.1" value={pctValue("proto_pct")} onChange={(e) => handlePct("proto_pct", e.target.value)} className="font-mono" data-testid="input-proto-pct" /></div>
                     </div>
                   </div>
                 </TabsContent>
@@ -548,22 +584,22 @@ export default function Calculator() {
                   <div className="space-y-4">
                     <h3 className="font-bold text-lg border-b border-border/50 pb-2">Finance Costs</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="space-y-2"><Label>WIP Steel Rate %</Label><Input type="number" step="0.1" value={pctValue('wipSteelRate')} onChange={(e) => handlePctChange('wipSteelRate', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>WIP Steel Months</Label><Input type="number" step="0.1" value={inputs.wipSteelMonths} onChange={(e) => handleInputChange('wipSteelMonths', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>WIP Zinc Rate %</Label><Input type="number" step="0.1" value={pctValue('wipZincRate')} onChange={(e) => handlePctChange('wipZincRate', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>WIP Zinc Months</Label><Input type="number" step="0.1" value={inputs.wipZincMonths} onChange={(e) => handleInputChange('wipZincMonths', e.target.value)} className="font-mono" /></div>
+                      <div className="space-y-2"><Label>WIP Steel Rate % (monthly)</Label><Input type="number" step="0.01" value={pctValue("wip_steel_rate")} onChange={(e) => handlePct("wip_steel_rate", e.target.value)} className="font-mono" data-testid="input-wip-steel-rate" /></div>
+                      <div className="space-y-2"><Label>WIP Steel Months</Label><Input type="number" step="0.1" value={inputs.wip_steel_months ?? 0} onChange={(e) => handleNum("wip_steel_months", e.target.value)} className="font-mono" data-testid="input-wip-steel-months" /></div>
+                      <div className="space-y-2"><Label>WIP Zinc Rate % (monthly)</Label><Input type="number" step="0.01" value={pctValue("wip_zinc_rate")} onChange={(e) => handlePct("wip_zinc_rate", e.target.value)} className="font-mono" data-testid="input-wip-zinc-rate" /></div>
+                      <div className="space-y-2"><Label>WIP Zinc Months</Label><Input type="number" step="0.1" value={inputs.wip_zinc_months ?? 0} onChange={(e) => handleNum("wip_zinc_months", e.target.value)} className="font-mono" data-testid="input-wip-zinc-months" /></div>
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="font-bold text-lg border-b border-border/50 pb-2">Contingency (₹/mt)</h3>
+                    <h3 className="font-bold text-lg border-b border-border/50 pb-2">Contractual / Contingency (₹/MT)</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="space-y-2"><Label>Inspection & Ins.</Label><Input type="number" value={inputs.inspectIns} onChange={(e) => handleInputChange('inspectIns', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>Special Packing</Label><Input type="number" value={inputs.spPacking} onChange={(e) => handleInputChange('spPacking', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>Freight Out</Label><Input type="number" value={inputs.freightOut} onChange={(e) => handleInputChange('freightOut', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>Third Party Trans.</Label><Input type="number" value={inputs.thirdParty} onChange={(e) => handleInputChange('thirdParty', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>Agency Comm.</Label><Input type="number" value={inputs.agencyComm} onChange={(e) => handleInputChange('agencyComm', e.target.value)} className="font-mono" /></div>
-                      <div className="space-y-2"><Label>BG Cost</Label><Input type="number" value={inputs.bgCost} onChange={(e) => handleInputChange('bgCost', e.target.value)} className="font-mono" /></div>
+                      {CONTINGENCY_FIELDS.map((f) => (
+                        <div key={f.key} className="space-y-2">
+                          <Label>{f.label}</Label>
+                          <Input type="number" value={inputs[f.key] ?? 0} onChange={(e) => handleNum(f.key, e.target.value)} className="font-mono" data-testid={`input-${f.key}`} />
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </TabsContent>
@@ -572,35 +608,25 @@ export default function Calculator() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between border-b border-border/50 pb-2">
                       <h3 className="font-bold text-lg">Credit Costs</h3>
+                      <span className="font-mono text-sm text-muted-foreground">Total: {formatINR(results?.creditTotal ?? 0)}</span>
                     </div>
-                    
                     <div className="bg-muted/30 rounded-lg p-1 overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow className="border-border/50">
                             <TableHead className="w-[150px]">Component</TableHead>
-                            <TableHead>Rate %</TableHead>
+                            <TableHead>Rate % (monthly)</TableHead>
                             <TableHead>Months</TableHead>
                             <TableHead>% of Contract</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {[
-                            { id: 'openPo', name: 'Open PO' },
-                            { id: 'finalPayment', name: 'Final Payment' },
-                            { id: 'emd', name: 'EMD' },
-                            { id: 'lc', name: 'LC' },
-                            { id: 'vfs', name: 'VFS' },
-                            { id: 'abg', name: 'ABG' },
-                            { id: 'pbg', name: 'PBG' },
-                            { id: 'cpbg', name: 'CPBG' },
-                            { id: 'advance', name: 'Advance' }
-                          ].map(item => (
+                          {CREDIT_COMPONENTS.map((item) => (
                             <TableRow key={item.id} className="border-border/50">
                               <TableCell className="font-medium text-xs sm:text-sm">{item.name}</TableCell>
-                              <TableCell className="p-2"><Input type="number" step="0.1" className="h-8 font-mono text-sm bg-background" value={pctValue(`${item.id}Rate`)} onChange={(e) => handlePctChange(`${item.id}Rate`, e.target.value)} /></TableCell>
-                              <TableCell className="p-2"><Input type="number" step="0.1" className="h-8 font-mono text-sm bg-background" value={inputs[`${item.id}Months`]} onChange={(e) => handleInputChange(`${item.id}Months`, e.target.value)} /></TableCell>
-                              <TableCell className="p-2"><Input type="number" step="0.1" className="h-8 font-mono text-sm bg-background" value={pctValue(`${item.id}Pct`)} onChange={(e) => handlePctChange(`${item.id}Pct`, e.target.value)} /></TableCell>
+                              <TableCell className="p-2"><Input type="number" step="0.01" className="h-8 font-mono text-sm bg-background" value={pctValue(`${item.id}_rate`)} onChange={(e) => handlePct(`${item.id}_rate`, e.target.value)} data-testid={`input-${item.id}-rate`} /></TableCell>
+                              <TableCell className="p-2"><Input type="number" step="0.1" className="h-8 font-mono text-sm bg-background" value={inputs[`${item.id}_months`] ?? 0} onChange={(e) => handleNum(`${item.id}_months`, e.target.value)} data-testid={`input-${item.id}-months`} /></TableCell>
+                              <TableCell className="p-2"><Input type="number" step="0.1" className="h-8 font-mono text-sm bg-background" value={pctValue(`${item.id}_pct`)} onChange={(e) => handlePct(`${item.id}_pct`, e.target.value)} data-testid={`input-${item.id}-pct`} /></TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -614,43 +640,44 @@ export default function Calculator() {
                     <div>
                       <h3 className="font-bold text-lg border-b border-border/50 pb-2 mb-4">Margin Strategy</h3>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {[0.03, 0.05, 0.08, 0.10].map(val => (
-                          <Card 
-                            key={val} 
-                            className={`cursor-pointer transition-all border ${inputs.marginPct === val ? 'border-primary ring-1 ring-primary bg-primary/10' : 'border-border/50 hover:border-primary/50'}`}
-                            onClick={() => handleInputChange('marginPct', val.toString())}
-                          >
-                            <CardContent className="p-6 flex flex-col items-center justify-center text-center">
-                              <span className="text-3xl font-bold font-mono">{(val * 100).toFixed(0)}%</span>
-                              <span className="text-xs text-muted-foreground mt-1">Margin</span>
-                            </CardContent>
-                          </Card>
-                        ))}
+                        {[0, 1, 2, 3].map((idx) => {
+                          const m = results?.margins[idx];
+                          return (
+                            <Card
+                              key={idx}
+                              className={`cursor-pointer transition-all border ${selectedMarginIdx === idx ? "border-primary ring-1 ring-primary bg-primary/10" : "border-border/50 hover:border-primary/50"}`}
+                              onClick={() => setSelectedMarginIdx(idx)}
+                              data-testid={`card-margin-${idx}`}
+                            >
+                              <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                                <span className="text-3xl font-bold font-mono">{((m?.pct ?? 0) * 100).toFixed(0)}%</span>
+                                <span className="text-xs text-muted-foreground mt-1">{m ? formatINR(m.quote) : "—"}</span>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
                       </div>
                     </div>
-                    
-                    <div className="space-y-2 max-w-sm">
-                      <Label>Custom Margin %</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={pctValue('marginPct')}
-                        onChange={(e) => handlePctChange('marginPct', e.target.value)}
-                        className="font-mono"
-                        data-testid="input-custom-margin"
-                      />
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl">
+                      {[0, 1, 2, 3].map((idx) => (
+                        <div key={idx} className="space-y-2">
+                          <Label>Margin {idx + 1} %</Label>
+                          <Input type="number" step="0.1" value={pctValue(`margin_${idx}`)} onChange={(e) => handlePct(`margin_${idx}`, e.target.value)} className="font-mono" data-testid={`input-margin-${idx}`} />
+                        </div>
+                      ))}
                     </div>
 
                     <div className="space-y-2">
                       <Label>Quote Notes</Label>
-                      <Input value={inputs.notes} onChange={(e) => handleStringChange('notes', e.target.value)} placeholder="Internal notes about this quote calculation..." />
+                      <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Internal notes about this quote calculation..." data-testid="input-notes" />
                     </div>
 
                     <Alert className="bg-primary/5 border-primary/20">
                       <AlertCircle className="h-4 w-4 text-primary" />
                       <AlertTitle className="text-primary font-bold">Live Estimate</AlertTitle>
                       <AlertDescription className="text-sm font-mono mt-1">
-                        Current projected price: {formatINR(costBreakdown.quotePrice)} / MT
+                        Current projected price: {formatINR(quotePrice)} / MT
                       </AlertDescription>
                     </Alert>
                   </div>
@@ -660,14 +687,14 @@ export default function Calculator() {
 
             <div className="flex justify-between pt-4 px-4 sm:px-0">
               <Button variant="outline" onClick={goBack}>Back</Button>
-              <Button onClick={() => setStep(4)} className="font-bold">
+              <Button onClick={() => setStep(4)} className="font-bold" disabled={!results}>
                 Review & Save Quote <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
           </div>
         )}
 
-        {step === 4 && (
+        {step === 4 && results && (
           <div className="p-6 md:p-8 space-y-8 animate-in slide-in-from-right-4 duration-300">
             <div>
               <h2 className="text-xl font-bold mb-2">Step 4: Verify & Save</h2>
@@ -681,9 +708,10 @@ export default function Calculator() {
                     <CardTitle className="text-sm font-bold">Project Summary</CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 space-y-2 text-sm">
-                    <div className="flex justify-between"><span className="text-muted-foreground">Customer</span><span className="font-medium">{customers?.find(c => c.id.toString() === customerId)?.name}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Customer</span><span className="font-medium">{customers?.find((c) => c.id.toString() === customerId)?.name}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Project Ref</span><span className="font-mono">{projectRef}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Structure</span><span className="font-medium">{structureType} {kvOption ? `(${kvOption})` : ''}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Structure</span><span className="font-medium">{structureType.trim()} {kvOption ? `(${kvOption})` : ""}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Make / Grade</span><span className="font-medium">{inputs.make} / {inputs.matType}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Revision</span><span className="font-mono text-primary font-bold">Rev {nextRevision}</span></div>
                   </CardContent>
                 </Card>
@@ -693,14 +721,15 @@ export default function Calculator() {
                   <div className="bg-muted/30 rounded-lg p-1">
                     <Table>
                       <TableBody>
-                        <TableRow className="border-border/50"><TableCell>RM Net Cost</TableCell><TableCell className="text-right font-mono">{formatINR(costBreakdown.rmNet)}</TableCell></TableRow>
-                        <TableRow className="border-border/50"><TableCell>Zinc Cost</TableCell><TableCell className="text-right font-mono">{formatINR(costBreakdown.zincCost)}</TableCell></TableRow>
-                        <TableRow className="border-border/50"><TableCell>Conversion Total</TableCell><TableCell className="text-right font-mono">{formatINR(costBreakdown.convTotal)}</TableCell></TableRow>
-                        <TableRow className="border-border/50"><TableCell>Prototype Cost</TableCell><TableCell className="text-right font-mono">{formatINR(costBreakdown.protoCostPerMt)}</TableCell></TableRow>
-                        <TableRow className="border-border/50"><TableCell>Finance Cost</TableCell><TableCell className="text-right font-mono">{formatINR(costBreakdown.financeCost)}</TableCell></TableRow>
-                        <TableRow className="border-border/50"><TableCell>Contingency</TableCell><TableCell className="text-right font-mono">{formatINR(costBreakdown.contingency)}</TableCell></TableRow>
-                        <TableRow className="border-border/50"><TableCell>Credit Costs</TableCell><TableCell className="text-right font-mono">{formatINR(costBreakdown.creditTotal)}</TableCell></TableRow>
-                        <TableRow className="border-border/50 bg-accent/5"><TableCell className="font-bold">Total Before Margin</TableCell><TableCell className="text-right font-mono font-bold text-accent">{formatINR(costBreakdown.totalBeforeMargin)}</TableCell></TableRow>
+                        <TableRow className="border-border/50"><TableCell>Steel (RM + scrap + recovery)</TableCell><TableCell className="text-right font-mono">{formatINR(results.steel.total)}</TableCell></TableRow>
+                        <TableRow className="border-border/50"><TableCell>Zinc Cost</TableCell><TableCell className="text-right font-mono">{formatINR(results.zinc.total)}</TableCell></TableRow>
+                        <TableRow className="border-border/50"><TableCell>Conversion Total</TableCell><TableCell className="text-right font-mono">{formatINR(results.conversion)}</TableCell></TableRow>
+                        <TableRow className="border-border/50"><TableCell>Prototype Cost</TableCell><TableCell className="text-right font-mono">{formatINR(results.proto)}</TableCell></TableRow>
+                        <TableRow className="border-border/50"><TableCell>Finance Cost</TableCell><TableCell className="text-right font-mono">{formatINR(results.financing.total)}</TableCell></TableRow>
+                        <TableRow className="border-border/50"><TableCell>Contractual / Contingency</TableCell><TableCell className="text-right font-mono">{formatINR(results.contractual)}</TableCell></TableRow>
+                        <TableRow className="border-border/50 bg-accent/5"><TableCell className="font-bold">Subtotal</TableCell><TableCell className="text-right font-mono font-bold">{formatINR(results.subtotal)}</TableCell></TableRow>
+                        <TableRow className="border-border/50"><TableCell>Credit Costs</TableCell><TableCell className="text-right font-mono">{formatINR(results.creditTotal)}</TableCell></TableRow>
+                        <TableRow className="border-border/50 bg-accent/5"><TableCell className="font-bold">Total Before Margin</TableCell><TableCell className="text-right font-mono font-bold text-accent">{formatINR(results.total)}</TableCell></TableRow>
                       </TableBody>
                     </Table>
                   </div>
@@ -711,34 +740,27 @@ export default function Calculator() {
                 <Card className="border-primary/30 bg-primary/5">
                   <CardHeader className="text-center pb-2">
                     <CardTitle className="text-sm font-bold text-primary uppercase tracking-wider">Final Quote Price</CardTitle>
-                    <CardDescription>Based on {(inputs.marginPct * 100).toFixed(1)}% margin</CardDescription>
+                    <CardDescription>Based on {((results.margins[selectedMarginIdx]?.pct ?? 0) * 100).toFixed(1)}% margin</CardDescription>
                   </CardHeader>
                   <CardContent className="text-center pb-6">
-                    <div className="text-5xl font-mono font-bold text-primary tracking-tighter">
-                      {formatINR(costBreakdown.quotePrice)}
+                    <div className="text-5xl font-mono font-bold text-primary tracking-tighter" data-testid="text-quote-price">
+                      {formatINR(quotePrice)}
                     </div>
                     <div className="text-sm text-muted-foreground mt-2 font-mono">per Metric Ton</div>
                   </CardContent>
                   <CardFooter>
-                    <Button 
-                      size="lg" 
-                      className="w-full font-bold text-lg h-14" 
-                      onClick={handleSaveQuote}
-                      disabled={createQuote.isPending}
-                    >
+                    <Button size="lg" className="w-full font-bold text-lg h-14" onClick={handleSaveQuote} disabled={createQuote.isPending} data-testid="button-save-quote">
                       {createQuote.isPending ? "Saving..." : "Confirm & Save Quote"}
                     </Button>
                   </CardFooter>
                 </Card>
 
-                {inputs.notes && (
+                {notes && (
                   <Card className="border-border/50 bg-card/50">
                     <CardHeader className="py-3 px-4 border-b border-border/50">
                       <CardTitle className="text-sm font-bold">Notes</CardTitle>
                     </CardHeader>
-                    <CardContent className="p-4 text-sm text-muted-foreground">
-                      {inputs.notes}
-                    </CardContent>
+                    <CardContent className="p-4 text-sm text-muted-foreground">{notes}</CardContent>
                   </Card>
                 )}
               </div>

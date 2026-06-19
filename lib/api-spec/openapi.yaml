@@ -576,7 +576,7 @@ components:
 
     Quote:
       type: object
-      required: [id, customerId, customerName, projectRef, revision, structureType, kvOption, quotePricePerMt, totalCost, inputs, costBreakdown, generatedByName, createdAt]
+      required: [id, customerId, customerName, projectRef, revision, structureType, kvOption, quotePricePerMt, totalCost, inputs, costBreakdown, generatedByName, legacy, createdAt]
       properties:
         id:
           type: integer
@@ -617,6 +617,9 @@ components:
           type: ["string", "null"]
         approvedByName:
           type: ["string", "null"]
+        legacy:
+          type: boolean
+          description: True for quotes computed by the pre-reconciliation engine; shown read-only
         createdAt:
           type: string
 

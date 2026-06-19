@@ -225,6 +225,7 @@ export const ListQuotesResponseItem = zod.object({
   "approved": zod.boolean().optional(),
   "approvedAt": zod.string().nullish(),
   "approvedByName": zod.string().nullish(),
+  "legacy": zod.boolean().describe('True for quotes computed by the pre-reconciliation engine; shown read-only'),
   "createdAt": zod.string()
 })
 export const ListQuotesResponse = zod.array(ListQuotesResponseItem)
@@ -284,6 +285,7 @@ export const GetQuoteResponse = zod.object({
   "approved": zod.boolean().optional(),
   "approvedAt": zod.string().nullish(),
   "approvedByName": zod.string().nullish(),
+  "legacy": zod.boolean().describe('True for quotes computed by the pre-reconciliation engine; shown read-only'),
   "createdAt": zod.string()
 })
 
@@ -319,6 +321,7 @@ export const GetQuotesByProjectResponseItem = zod.object({
   "approved": zod.boolean().optional(),
   "approvedAt": zod.string().nullish(),
   "approvedByName": zod.string().nullish(),
+  "legacy": zod.boolean().describe('True for quotes computed by the pre-reconciliation engine; shown read-only'),
   "createdAt": zod.string()
 })
 export const GetQuotesByProjectResponse = zod.array(GetQuotesByProjectResponseItem)
@@ -354,6 +357,7 @@ export const ApproveQuoteResponse = zod.object({
   "approved": zod.boolean().optional(),
   "approvedAt": zod.string().nullish(),
   "approvedByName": zod.string().nullish(),
+  "legacy": zod.boolean().describe('True for quotes computed by the pre-reconciliation engine; shown read-only'),
   "createdAt": zod.string()
 })
 
@@ -397,6 +401,7 @@ export const GetRecentQuotesResponseItem = zod.object({
   "approved": zod.boolean().optional(),
   "approvedAt": zod.string().nullish(),
   "approvedByName": zod.string().nullish(),
+  "legacy": zod.boolean().describe('True for quotes computed by the pre-reconciliation engine; shown read-only'),
   "createdAt": zod.string()
 })
 export const GetRecentQuotesResponse = zod.array(GetRecentQuotesResponseItem)

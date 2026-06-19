@@ -36,5 +36,7 @@ export interface Quote {
   approvedAt?: string | null;
   /** @nullable */
   approvedByName?: string | null;
+  /** True for quotes computed by the pre-reconciliation engine; shown read-only */
+  legacy: boolean;
   createdAt: string;
 }
