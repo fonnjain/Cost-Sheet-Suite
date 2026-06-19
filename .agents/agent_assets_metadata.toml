@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "sjX9Pilpfu2rof8wpIw0G"
+uri = "file://ARCHITECTURE.md"
+type = "text"
+title = "Project Architecture"
