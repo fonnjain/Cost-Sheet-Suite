@@ -259,6 +259,7 @@ export default function Review() {
 
   // Currently approved revision (if any) drives the checkbox state.
   const approvedQuote = useMemo(() => sortedQuotes.find((q) => q.approved) ?? null, [sortedQuotes]);
+  const hasLegacy = useMemo(() => sortedQuotes.some((q) => q.legacy), [sortedQuotes]);
   const [selectedQuoteId, setSelectedQuoteId] = useState<number | null>(null);
 
   // The ticked row: explicit selection wins, but only if it belongs to the loaded
@@ -426,6 +427,12 @@ export default function Review() {
           </Card>
         ) : (
           <>
+            {hasLegacy && (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300" data-testid="banner-legacy">
+                Some revisions below were computed on the previous logic (legacy) before the cost-sheet reconciliation. They are shown read-only for reference and were not recalculated by the current engine.
+              </div>
+            )}
+
             {/* Project KPIs */}
             {summary && (
               <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
@@ -521,8 +528,8 @@ export default function Review() {
                                 </Badge>
                               )}
                               {q.legacy && (
-                                <Badge variant="outline" className="gap-1 text-amber-400 border-amber-500/40" title="Computed by the pre-reconciliation engine — read-only" data-testid={`badge-legacy-${q.revision}`}>
-                                  Legacy
+                                <Badge variant="outline" className="gap-1 text-amber-400 border-amber-500/40" title="Computed on previous logic (legacy) — read-only" data-testid={`badge-legacy-${q.revision}`}>
+                                  Legacy · prev. logic
                                 </Badge>
                               )}
                               {!q.approved && !q.legacy && (
@@ -733,7 +740,12 @@ export default function Review() {
                         </TableCell>
                         <TableCell className="text-sm">{quote.generatedByName}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {format(new Date(quote.createdAt), "dd MMM yyyy, HH:mm")}
+                          <div>{format(new Date(quote.createdAt), "dd MMM yyyy, HH:mm")}</div>
+                          {quote.legacy && (
+                            <div className="text-xs text-amber-400 mt-0.5" data-testid={`legacy-note-${quote.revision}`}>
+                              Computed on previous logic (legacy)
+                            </div>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

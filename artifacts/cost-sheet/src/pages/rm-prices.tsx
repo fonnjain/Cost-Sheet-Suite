@@ -161,7 +161,7 @@ export default function RmPrices() {
       const text = ev.target?.result as string;
       const parsed = parseImportedCsv(text);
       if (!parsed) {
-        toast({ variant: "destructive", title: "Import Failed", description: "Could not parse file. Expected CSV with cell key and value columns (e.g. C6,384400)." });
+        toast({ variant: "destructive", title: "Import Failed", description: "Could not read the file. Please use a CSV exported from this console." });
         return;
       }
       setImportPreview(parsed);
@@ -248,8 +248,8 @@ export default function RmPrices() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   {group.items.map((item) => (
                     <div key={item.key} className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground truncate block" title={`${item.label} [${item.key}]`}>
-                        {item.label} <span className="font-mono opacity-60">[{item.key}]</span>
+                      <Label className="text-xs text-muted-foreground truncate block" title={item.label}>
+                        {item.label}
                       </Label>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">₹</span>
@@ -293,8 +293,8 @@ export default function RmPrices() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   {group.items.map((item) => (
                     <div key={item.key} className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground truncate block" title={`${item.label} [${item.key}]`}>
-                        {item.label} <span className="font-mono opacity-60">[{item.key}]</span>
+                      <Label className="text-xs text-muted-foreground truncate block" title={item.label}>
+                        {item.label}
                       </Label>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">₹</span>
@@ -404,7 +404,6 @@ export default function RmPrices() {
             <Table>
               <TableHeader className="sticky top-0 bg-card">
                 <TableRow>
-                  <TableHead>Cell</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="text-right">Value (₹)</TableHead>
                   <TableHead className="text-center">Type</TableHead>
@@ -413,7 +412,6 @@ export default function RmPrices() {
               <TableBody>
                 {ALL_DAILY_ITEMS.map((item) => (
                   <TableRow key={item.key}>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{item.key}</TableCell>
                     <TableCell className="text-sm">{item.label}</TableCell>
                     <TableCell className="text-right font-mono font-bold">
                       {(dailyData[item.key] ?? item.default).toLocaleString("en-IN")}
@@ -425,7 +423,6 @@ export default function RmPrices() {
                 ))}
                 {ALL_TWICE_ITEMS.map((item) => (
                   <TableRow key={item.key} className={!isWindowOpen ? "opacity-50" : ""}>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{item.key}</TableCell>
                     <TableCell className="text-sm">{item.label}</TableCell>
                     <TableCell className="text-right font-mono font-bold">
                       {(twiceMonthlyData[item.key] ?? item.default).toLocaleString("en-IN")}
@@ -471,7 +468,6 @@ export default function RmPrices() {
             <Table>
               <TableHeader className="sticky top-0 bg-card">
                 <TableRow>
-                  <TableHead>Cell</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="text-right">Imported Value (₹)</TableHead>
                 </TableRow>
@@ -479,10 +475,10 @@ export default function RmPrices() {
               <TableBody>
                 {importPreview && Object.entries(importPreview).map(([key, val]) => {
                   const item = ALL_ITEMS.find((i) => i.key === key);
+                  if (!item) return null;
                   return (
                     <TableRow key={key}>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{key}</TableCell>
-                      <TableCell className="text-sm">{item?.label ?? "Unknown cell"}</TableCell>
+                      <TableCell className="text-sm">{item.label}</TableCell>
                       <TableCell className="text-right font-mono font-bold text-primary">
                         {val.toLocaleString("en-IN")}
                       </TableCell>
