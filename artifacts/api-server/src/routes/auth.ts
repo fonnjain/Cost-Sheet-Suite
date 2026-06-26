@@ -4,7 +4,7 @@ import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
 import { usersTable, sessionsTable } from "@workspace/db/schema";
 import { LoginBody, GetMeResponse } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, extractToken } from "../middlewares/auth";
 
 const router = Router();
 
@@ -46,8 +46,10 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 });
 
 router.post("/auth/logout", requireAuth, async (req, res): Promise<void> => {
-  const token = req.headers["x-session-token"] as string;
-  await db.delete(sessionsTable).where(eq(sessionsTable.token, token));
+  const token = extractToken(req);
+  if (token) {
+    await db.delete(sessionsTable).where(eq(sessionsTable.token, token));
+  }
   res.json({ success: true });
 });
 

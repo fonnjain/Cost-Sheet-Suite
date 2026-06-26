@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useGetRmPrices, useSaveRmPrices, useGetMe } from "@workspace/api-client-react";
+import { useGetRmPrices, useSaveRmPrices } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,6 @@ function parseImportedCsv(text: string): Record<string, number> | null {
 export default function RmPrices() {
   const { data: rmPrices, isLoading } = useGetRmPrices();
   const saveRmPrices = useSaveRmPrices();
-  const { data: user } = useGetMe();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [, setLocation] = useLocation();
@@ -90,8 +89,9 @@ export default function RmPrices() {
   const [previewMake, setPreviewMake] = useState<string>("");
 
   const today = new Date();
-  const is1stOr15th = today.getDate() === 1 || today.getDate() === 15;
-  const isWindowOpen = is1stOr15th || rmPrices?.isWindowUnlocked || user?.role === "admin";
+  // The window is open only when the server says so: automatically on the 1st or
+  // 16th of the month, or after an admin explicitly unlocks it from the Admin panel.
+  const isWindowOpen = !!rmPrices?.isWindowUnlocked;
 
   useEffect(() => {
     if (rmPrices) {
@@ -282,7 +282,7 @@ export default function RmPrices() {
             </div>
             {!isWindowOpen && (
               <CardDescription className="text-amber-500/80 mt-1">
-                Only editable on 1st or 15th of the month. Admin can unlock from the Admin panel.
+                Only editable on 1st or 16th of the month. Admin can unlock from the Admin panel.
               </CardDescription>
             )}
           </CardHeader>

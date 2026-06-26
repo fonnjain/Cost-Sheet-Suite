@@ -22,14 +22,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
 import { formatINR } from "@/lib/costCalculator";
-import { buildRMData, calculateCostSheet, buildDefaultInputs, getDistinctMakes, MASTER_SPECS } from "@/lib/v6/engine";
+import { buildRMData, calculateCostSheet, buildDefaultInputs, MASTER_SPECS } from "@/lib/v6/engine";
 import { toLegacyShape } from "@/lib/v6/legacy";
 import { ChevronRight, ChevronLeft, Check, Plus, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SearchableSelect } from "@/components/searchable-select";
 
-// Phase 1 scope: TLT (3 bands) + Sub-Station (L) (3 bands) + out-source <150.
-// Names trace exactly to MASTER_SPECS keys in the v6 workbook (all `tlt5` schema).
+// Phase 1 scope: TLT (3 bands) + Sub-Station (L) (3 bands) + out-source <150 +
+// RSJ Pole - Base Plate. Names trace exactly to MASTER_SPECS keys in the v6
+// workbook (all `tlt5` schema, so they share the same Make/Voltage/Grade inputs).
 const PHASE1_FAMILIES: { group: string; items: string[] }[] = [
   {
     group: "Transmission Line Towers (TLT)",
@@ -43,7 +44,17 @@ const PHASE1_FAMILIES: { group: string; items: string[] }[] = [
     group: "Outsourced TLT",
     items: ["out source < 150 mt "],
   },
+  {
+    group: "RSJ Poles",
+    items: ["RSJ Pole - Base Plate "],
+  },
 ];
+
+// Make / RM-category options for the TLT / Sub-Station family, exactly as the
+// source data-validation lists define them. Do NOT derive these by splitting the
+// supplier make tags (that fragments "PG/NTPC" into "PG"+"NTPC" and leaks the
+// internal "Tested" tag) — the engine matches on the full tag.
+const MAKE_OPTIONS = ["NPG", "MAIN/BSEN", "CORE", "PG/NTPC"];
 
 // Build-up field metadata, keyed by v6 input names.
 const CONVERSION_FIELDS: { key: string; label: string }[] = [
@@ -126,11 +137,6 @@ export default function Calculator() {
       }),
     [rmPrices]
   );
-  const makeOptions = useMemo(() => {
-    const makes = getDistinctMakes(rm);
-    return makes.includes("PG/NTPC") ? makes : ["PG/NTPC", ...makes];
-  }, [rm]);
-
   const spec = structureType ? (MASTER_SPECS as Record<string, any>)[structureType] : null;
 
   // Step 3 State (v6 input keys)
@@ -459,7 +465,7 @@ export default function Calculator() {
                   <Select value={inputs.make ?? ""} onValueChange={(v) => handleStr("make", v)}>
                     <SelectTrigger data-testid="select-make"><SelectValue placeholder="Select make…" /></SelectTrigger>
                     <SelectContent side="bottom">
-                      {makeOptions.map((m) => (
+                      {MAKE_OPTIONS.map((m) => (
                         <SelectItem key={m} value={m}>{m}</SelectItem>
                       ))}
                     </SelectContent>

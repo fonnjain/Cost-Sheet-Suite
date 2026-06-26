@@ -172,19 +172,18 @@ via middleware unless noted.
 - `src/routes/auth.ts`:
   - `POST /api/auth/login` (no auth) — email lookup against the allowlist;
     issues a 30-day session token.
-  - `POST /api/auth/logout` — deletes the session row matching the
-    `X-Session-Token` header. Note: `requireAuth` authenticates primarily via the
-    `Authorization: Bearer` header, and the generated client does not send
-    `X-Session-Token`, so a Bearer-authenticated logout can return success
-    without deleting the underlying session row (it then expires naturally). This
-    is a known limitation rather than intended behavior.
+  - `POST /api/auth/logout` — deletes the session row matching the token
+    resolved by the shared `extractToken` helper (`Authorization: Bearer
+    <token>` first, `X-Session-Token` as a fallback). This is the same token the
+    generated client sends, so a Bearer-authenticated logout now revokes the
+    underlying session row immediately.
   - `GET /api/auth/me` — current user.
 - `src/routes/users.ts` (admin only) — `GET/POST /api/users`,
   `PATCH/DELETE /api/users/:id`.
 - `src/routes/customers.ts` — `GET/POST /api/customers`.
 - `src/routes/rm-prices.ts`:
   - `GET /api/rm-prices` — latest RM prices; `isWindowUnlocked` is true when
-    today is the 1st or 15th, or when an admin has explicitly unlocked it.
+    today is the 1st or 16th, or when an admin has explicitly unlocked it.
   - `POST /api/rm-prices` — save a new RM-price snapshot.
   - `GET /api/rm-prices/history` — last 30 snapshots.
   - `POST /api/rm-prices/unlock-twice-monthly` (admin only) — unlock the window.

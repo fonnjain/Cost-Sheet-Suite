@@ -13,7 +13,7 @@ declare global {
   }
 }
 
-function extractToken(req: Request): string | undefined {
+export function extractToken(req: Request): string | undefined {
   const bearer = req.headers["authorization"];
   if (bearer?.startsWith("Bearer ")) {
     return bearer.slice(7);

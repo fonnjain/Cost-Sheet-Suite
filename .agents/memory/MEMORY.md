@@ -1,3 +1,4 @@
 - [PDF export in cost-sheet](pdf-export.md) — jspdf+autotable from data (not html2canvas); strip ₹ before rendering; mirror UI highlights via passed-in flags.
+- [v6 make dropdowns](v6-make-dropdowns.md) — source calculator Make options from spec lists, not getDistinctMakes (it splits make tags on "/" and leaks Tested).
 - [v6 cost-sheet reconciliation](v6-reconciliation.md) — new quotes computed by v6 engine but stored in old flat shape via toLegacyShape; parity anchors 46231 / 76939@3%; data.ts auto-generated.
 - [Quote vendor-approval invariant](quote-approval.md) — at most one approved revision per customer+project; approve in one DB transaction; validate UI selection against loaded project.

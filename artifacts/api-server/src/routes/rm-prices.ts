@@ -20,7 +20,7 @@ function formatRmPrice(r: typeof rmPricesTable.$inferSelect) {
 
 function isTwiceMonthlyWindow(): boolean {
   const day = new Date().getDate();
-  return day === 1 || day === 15;
+  return day === 1 || day === 16;
 }
 
 router.get("/rm-prices", requireAuth, async (_req, res): Promise<void> => {

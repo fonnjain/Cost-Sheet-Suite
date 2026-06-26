@@ -1,0 +1,55 @@
+Three things to confirm/fix before I sign off on the build. Please treat the
+uploaded "Cost Sheet Logic & Replit Correction" document as the acceptance spec.
+
+--------------------------------------------------------------------------------
+1. PROVE THE TO-THE-RUPEE ACCURACY (don't just assert it).
+--------------------------------------------------------------------------------
+The architecture says the v6 engine reproduces the workbook "to the rupee."
+Please run these three structures in the live app and show me the actual
+computed outputs (weighted RM price, steel, zinc, conversion, subtotal, total,
+and the margin quotes), so I can compare them against the v6 workbook:
+
+  - TLT >800 mt           - voltage 220/330/400,     Make PG/NTPC,   Grade MS
+  - TLT 151-400 mt        - voltage 33/66/110/132,   Make PG/NTPC,   Grade MS
+  - RSJ Pole - Base Plate - voltage 220/330/400,     Make MAIN/BSEN, Grade MS
+
+If any line differs, it's a wiring bug in the port - do NOT change any formula,
+value, or ratio to "make it match"; find and fix the wiring.
+
+--------------------------------------------------------------------------------
+2. FIX THE TWICE-MONTHLY UNLOCK RULE.
+--------------------------------------------------------------------------------
+Right now the code unlocks the twice-monthly RM panel (HR Plate + HR Coil)
+automatically when "today is the 1st or 15th." Change it to:
+
+  Unlock automatically on the 1st and 16th of each month (correct the existing
+  15th to the 16th), AND allow an admin to unlock it manually from the Admin
+  panel at any time.
+
+In all other cases the twice-monthly fields stay locked/read-only for normal
+users. Daily inputs remain always editable. The twice-monthly set must be
+exactly the 6 fields, labelled by source name, never by cell code:
+
+  HR Plate: Raipur_IS2062, Rourkela_IS2062, Raigarh_IS2062
+  HR Coil:  Kolkatta_IS2062, Raipur_IS2062, NCR_IS2062
+
+--------------------------------------------------------------------------------
+3. CONFIRM DROPDOWNS AND REMOVE JUNK.
+--------------------------------------------------------------------------------
+Confirm the structure dropdowns match the source data per family:
+
+  - TLT / Sub-Station: Make = NPG / MAIN-BSEN / CORE / PG-NTPC, plus Voltage,
+    Grade, and weight band.
+  - Fasteners: NPG / PG / NTPC, plus TLT / Substation, plus 4.6-5.6 / 6.8 / 8.8.
+  - Railways: CORE / NPG, plus C150 / C175-200 / C225-250, plus 610:4.25% /
+    1000:5.5%.
+
+Also confirm the stray test dropdown on the RLY-BFBRSJ sheet (the
+"apple, orange, banana" list) was NOT carried into the app.
+
+--------------------------------------------------------------------------------
+MINOR (lower priority)
+--------------------------------------------------------------------------------
+Bearer-authenticated logout currently doesn't delete the session row, so logout
+doesn't truly end the session server-side. Please make logout revoke the
+session.
