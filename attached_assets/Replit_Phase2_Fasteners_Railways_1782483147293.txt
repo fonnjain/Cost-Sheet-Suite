@@ -1,0 +1,85 @@
+PHASE 2 - WIRE FASTENERS AND RAILWAYS INTO THE CALCULATOR UI
+============================================================
+
+Continue using the uploaded "Cost Sheet Logic & Replit Correction" document as
+the acceptance spec. Both the fasteners and railways families already exist in
+the embedded source data (MASTER_SPECS / STRUCTURE_FAMILIES / the v6 engine);
+this task is ONLY about wiring them into the calculator UI so a user can select
+and quote them. Do not re-key any values, ratios, or options by hand - drive
+everything from the embedded v6 data, exactly as the TLT and RSJ families do.
+
+--------------------------------------------------------------------------------
+SCOPE
+--------------------------------------------------------------------------------
+Wire these structures into the calculator's structure picker and input form so
+they compute and save end-to-end like the existing families:
+
+  Fasteners family:
+    - Fasteners
+    - Foundation Bolts
+
+  Railways family:
+    - RLY-Mast
+    - RLY - Portal
+    - Rly - SPS
+    - Rly - Sp. Masts
+    - RLY-Drop Tubes
+    - RLY-BFBRSJ
+
+(Use the exact sheet names/keys as they appear in the embedded data. If a
+railways sheet listed here is not present in the embedded data, tell me rather
+than inventing it.)
+
+--------------------------------------------------------------------------------
+DROPDOWNS PER FAMILY (must match the embedded data exactly)
+--------------------------------------------------------------------------------
+Fasteners / Foundation Bolts:
+    - Make:        NPG, PG, NTPC
+    - Type:        TLT, Substation
+    - Grade:       4.6/5.6, 6.8, 8.8
+    - Weight band: 610:5%, 800:6%, 910:7%, 1000:7.5%
+  RM prices here are per hardware item (M-16 N&B, M-12 N&B, M-20 N&B, M-16 PW,
+  M-16 SPW, M-16 SB) - label by item name, never by cell code.
+
+Railways (RLY-Mast, RLY-Portal, Rly-SPS, Rly-Sp.Masts):
+    - Make:            CORE, NPG
+    - Channel section: C150, C175/200, C225/250
+    - Grade:           MS, HT
+    - Weight band:     610:4.25%, 1000:5.5%
+    - Galv/secondary band (where the sheet has it): 610:5%, 800:6%, 910:7%
+  Railways price by Plate Price + Channel Price per channel section.
+
+Single-band railways sheets (RLY-Drop Tubes, RLY-BFBRSJ): weight-band dropdown
+only (610:5%, 800:6%, 910:7%) plus fixed inputs - same as their embedded specs.
+
+IMPORTANT: confirm the stray "apple, orange, banana" test dropdown from the
+RLY-BFBRSJ sheet is NOT present anywhere in the wired UI.
+
+--------------------------------------------------------------------------------
+BEHAVIOUR (match the existing families)
+--------------------------------------------------------------------------------
+  - These families appear in the structure picker grouped under their family
+    headings, consistent with how TLT / Sub-Station / Poles are grouped.
+  - Selecting one builds its input form from the embedded per-sheet defaults
+    (same buildDefaultInputs path the TLT family uses), with the correct
+    dropdowns above.
+  - The cost build-up runs through the SAME v6 engine (calculateCostSheet) - no
+    separate or parallel calculation path for these families.
+  - Saving a quote works identically: revision auto-increments per
+    (customer + project), legacy flag = false, stored via the existing
+    toLegacyShape storage shape.
+
+--------------------------------------------------------------------------------
+VERIFY BEFORE YOU CALL IT DONE (show me the live outputs)
+--------------------------------------------------------------------------------
+Run these in the live app and show the actual computed outputs (weighted RM
+price, steel, zinc, conversion, subtotal, total, and the margin quotes) so I can
+check them against the v6 workbook to the rupee:
+
+  1. Fasteners      - Make PG, Type TLT, Grade 8.8, weight band 800:6%
+  2. RLY-Mast       - Make CORE, Channel C175/200, Grade MS, weight band 1000:5.5%
+  3. RLY-BFBRSJ     - weight band 800:6%
+
+If any line differs from the v6 workbook, it's a wiring bug - do NOT change any
+formula, value, or ratio to force a match; find and fix the wiring. Ask me
+before changing anything that could move a quote number.
