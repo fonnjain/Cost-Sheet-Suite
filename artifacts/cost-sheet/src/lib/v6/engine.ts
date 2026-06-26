@@ -499,11 +499,32 @@ export function buildDefaultInputs(spec: any, rm: RMData): Record<string, any> {
     inputs.make = "NPG";
     inputs.matType = "MS";
     inputs.zincMicron = d.zinc_micron != null ? d.zinc_micron : 0.05;
+  } else if (spec.schema === "hwfast") {
+    // Fasteners / Foundation Bolts: Hardware "Type" + Make drive the RM mix.
+    // Grade is captured for the record only (v6 never feeds it into the cost).
+    const typeOpts = spec.ratios.type_options || [];
+    inputs.hwType = typeOpts[0]?.type || "";
+    inputs.make = "NPG";
+    inputs.grade = "4.6/5.6";
+    inputs.matType = "MS";
+    inputs.zincMicron = d.zinc_micron != null ? d.zinc_micron : 0.05;
+  } else if (spec.schema === "railc") {
+    // Railways (channel): Steel section + Make + Material type drive the
+    // plate/channel blended RM price.
+    const secOpts = spec.ratios.sections || [];
+    inputs.section = secOpts[0]?.section || "";
+    inputs.make = "CORE";
+    inputs.matType = "MS";
+    inputs.zincMicron = d.zinc_micron != null ? d.zinc_micron : 0.0425;
   } else {
     inputs.manualRM = d.rm_price || 50000;
     inputs.matType = "MS";
     inputs.zincMicron = d.zinc_micron != null ? d.zinc_micron : 0.05;
   }
+  // v6 buildInputForm applies these steel-section fallbacks when a sheet's
+  // defaults omit them (e.g. Fasteners has no scrap/recovery default).
+  if (inputs.scrap_pct == null) inputs.scrap_pct = 0.04;
+  if (inputs.recovery_pct == null) inputs.recovery_pct = -0.4;
   inputs.zinc_price = d.zinc_price || rm.zincPrice || 285000;
   return inputs;
 }

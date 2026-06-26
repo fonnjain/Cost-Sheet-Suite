@@ -22,16 +22,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
 import { formatINR } from "@/lib/costCalculator";
-import { buildRMData, calculateCostSheet, buildDefaultInputs, MASTER_SPECS } from "@/lib/v6/engine";
+import { buildRMData, calculateCostSheet, buildDefaultInputs, getDistinctMakes, MASTER_SPECS } from "@/lib/v6/engine";
 import { toLegacyShape } from "@/lib/v6/legacy";
 import { ChevronRight, ChevronLeft, Check, Plus, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SearchableSelect } from "@/components/searchable-select";
 
-// Phase 1 scope: TLT (3 bands) + Sub-Station (L) (3 bands) + out-source <150 +
-// RSJ Pole - Base Plate. Names trace exactly to MASTER_SPECS keys in the v6
-// workbook (all `tlt5` schema, so they share the same Make/Voltage/Grade inputs).
-const PHASE1_FAMILIES: { group: string; items: string[] }[] = [
+// Structure families. Names trace exactly to MASTER_SPECS keys in the v6
+// workbook. The schema on each spec (tlt5/subp/rsj/hwfast/railc/misc/bfb)
+// drives which Step-2 selectors render and how the RM price is built.
+const STRUCTURE_FAMILIES: { group: string; items: string[] }[] = [
   {
     group: "Transmission Line Towers (TLT)",
     items: ["TLT >800 mt", "TLT 401-800 mt", "TLT 151 - 400 mt "],
@@ -48,6 +48,14 @@ const PHASE1_FAMILIES: { group: string; items: string[] }[] = [
     group: "RSJ Poles",
     items: ["RSJ Pole - Base Plate "],
   },
+  {
+    group: "Fasteners & Foundation Bolts",
+    items: ["Fasteners", "Foundation Bolts"],
+  },
+  {
+    group: "Railways",
+    items: ["RLY-Mast", "RLY - Portal", "Rly - SPS", "Rly - Sp. Masts ", "RLY-Drop Tubes", "RLY-BFBRSJ"],
+  },
 ];
 
 // Make / RM-category options for the TLT / Sub-Station family, exactly as the
@@ -55,6 +63,12 @@ const PHASE1_FAMILIES: { group: string; items: string[] }[] = [
 // supplier make tags (that fragments "PG/NTPC" into "PG"+"NTPC" and leaks the
 // internal "Tested" tag) — the engine matches on the full tag.
 const MAKE_OPTIONS = ["NPG", "MAIN/BSEN", "CORE", "PG/NTPC"];
+
+// Fasteners (hwfast) Make list, exactly as the v6 buildInputForm hardcodes it.
+const HWFAST_MAKES = ["NPG", "PG", "MAIN"];
+
+// Fasteners grade list (recorded only — never feeds the cost, faithful to v6).
+const GRADE_OPTIONS = ["4.6/5.6", "6.8", "8.8"];
 
 // Build-up field metadata, keyed by v6 input names.
 const CONVERSION_FIELDS: { key: string; label: string }[] = [
@@ -138,6 +152,26 @@ export default function Calculator() {
     [rmPrices]
   );
   const spec = structureType ? (MASTER_SPECS as Record<string, any>)[structureType] : null;
+  const schema = spec?.schema as string | undefined;
+  const isKvSchema = schema === "tlt5" || schema === "subp" || schema === "rsj";
+  const isHwfast = schema === "hwfast";
+  const isRailc = schema === "railc";
+  const isManual = !!spec && !isKvSchema && !isHwfast && !isRailc;
+
+  // Railways (channel) Make options: the v6 "full supplier list" (default CORE),
+  // de-duplicated case-insensitively so the internal "TESTED"/"Tested" pair shows
+  // once. Each option maps to a real supplier price column (engine matches tags).
+  const railcMakes = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const m of getDistinctMakes(rm)) {
+      const key = m.toUpperCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(m);
+    }
+    return out;
+  }, [rm]);
 
   // Step 3 State (v6 input keys)
   const [inputs, setInputs] = useState<Record<string, any>>({});
@@ -151,9 +185,18 @@ export default function Calculator() {
     if (!spec || !structureType) return;
     if (inputsForSpec === structureType) return;
     const defaults = buildDefaultInputs(spec, rm);
-    if (kvOption) defaults.kv = kvOption;
+    const sch = spec.schema;
+    const kvLike = sch === "tlt5" || sch === "subp" || sch === "rsj";
+    // kvOption holds the primary selection seeded from a prior revision; map it
+    // back onto the schema's primary selector field.
+    if (kvOption) {
+      if (kvLike) defaults.kv = kvOption;
+      else if (sch === "hwfast") defaults.hwType = kvOption;
+      else if (sch === "railc") defaults.section = kvOption;
+    }
     setInputs(defaults);
-    setKvOption(defaults.kv ?? "");
+    const sel = kvLike ? defaults.kv : sch === "hwfast" ? defaults.hwType : sch === "railc" ? defaults.section : "";
+    setKvOption(sel ?? "");
     setSelectedMarginIdx(0);
     setInputsForSpec(structureType);
   }, [spec, structureType, rm, kvOption, inputsForSpec]);
@@ -185,7 +228,8 @@ export default function Calculator() {
   };
   const handleStr = (key: string, value: string) => {
     setInputs((prev) => ({ ...prev, [key]: value }));
-    if (key === "kv") setKvOption(value);
+    // The schema's primary selector is echoed into kvOption (stored + revision seed).
+    if (key === "kv" || key === "hwType" || key === "section") setKvOption(value);
   };
 
   const handleCreateCustomer = async () => {
@@ -236,14 +280,27 @@ export default function Calculator() {
     else setStep(step - 1);
   };
 
+  // Step 2 is complete once the schema's primary selector has a value.
+  const step2Complete =
+    !!spec &&
+    (isKvSchema
+      ? !!inputs.kv
+      : isHwfast
+        ? !!inputs.hwType
+        : isRailc
+          ? !!inputs.section
+          : isManual
+            ? Number(inputs.manualRM) > 0
+            : false);
+
   const results = useMemo(() => {
-    if (!spec || !inputs.kv) return null;
+    if (!spec || !step2Complete) return null;
     try {
       return calculateCostSheet(rm, spec, inputs);
     } catch {
       return null;
     }
-  }, [rm, spec, inputs]);
+  }, [rm, spec, inputs, step2Complete]);
 
   const quotePrice = results?.margins[selectedMarginIdx]?.quote ?? 0;
 
@@ -280,7 +337,7 @@ export default function Calculator() {
   };
 
   const canProceedToStep2 = customerId && projectRef;
-  const canProceedToStep3 = !!structureType && !!inputs.kv;
+  const canProceedToStep3 = step2Complete;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto pb-20">
@@ -420,11 +477,11 @@ export default function Calculator() {
           <div className="p-6 md:p-8 space-y-8 animate-in slide-in-from-right-4 duration-300">
             <div>
               <h2 className="text-xl font-bold mb-2">Step 2: Pick Structure</h2>
-              <p className="text-sm text-muted-foreground">Select the structure, then the voltage class, make and material grade.</p>
+              <p className="text-sm text-muted-foreground">Select the structure, then its specification options.</p>
             </div>
 
             <div className="space-y-8">
-              {PHASE1_FAMILIES.map((family) => (
+              {STRUCTURE_FAMILIES.map((family) => (
                 <div key={family.group} className="space-y-3">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">
                     {family.group}
@@ -449,39 +506,146 @@ export default function Calculator() {
 
             {spec && (
               <div className="pt-6 border-t border-border/50 grid gap-4 sm:grid-cols-3 animate-in fade-in zoom-in duration-300">
-                <div className="space-y-2">
-                  <Label className="text-primary font-bold">Voltage class (kV)</Label>
-                  <Select value={inputs.kv ?? ""} onValueChange={(v) => handleStr("kv", v)}>
-                    <SelectTrigger className="border-primary/50" data-testid="select-kv"><SelectValue placeholder="Select voltage…" /></SelectTrigger>
-                    <SelectContent side="bottom">
-                      {spec.ratios.kv_options.map((o: any) => (
-                        <SelectItem key={o.kv} value={o.kv}>{o.kv}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Make</Label>
-                  <Select value={inputs.make ?? ""} onValueChange={(v) => handleStr("make", v)}>
-                    <SelectTrigger data-testid="select-make"><SelectValue placeholder="Select make…" /></SelectTrigger>
-                    <SelectContent side="bottom">
-                      {MAKE_OPTIONS.map((m) => (
-                        <SelectItem key={m} value={m}>{m}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Material type</Label>
-                  <Select value={inputs.matType ?? "MS"} onValueChange={(v) => handleStr("matType", v)}>
-                    <SelectTrigger data-testid="select-mat-type"><SelectValue /></SelectTrigger>
-                    <SelectContent side="bottom">
-                      {MATERIAL_TYPES.map((m) => (
-                        <SelectItem key={m} value={m}>{m}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {isKvSchema && (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-primary font-bold">Voltage class (kV)</Label>
+                      <Select value={inputs.kv ?? ""} onValueChange={(v) => handleStr("kv", v)}>
+                        <SelectTrigger className="border-primary/50" data-testid="select-kv"><SelectValue placeholder="Select voltage…" /></SelectTrigger>
+                        <SelectContent side="bottom">
+                          {spec.ratios.kv_options.map((o: any) => (
+                            <SelectItem key={o.kv} value={o.kv}>{o.kv}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Make</Label>
+                      <Select value={inputs.make ?? ""} onValueChange={(v) => handleStr("make", v)}>
+                        <SelectTrigger data-testid="select-make"><SelectValue placeholder="Select make…" /></SelectTrigger>
+                        <SelectContent side="bottom">
+                          {MAKE_OPTIONS.map((m) => (
+                            <SelectItem key={m} value={m}>{m}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Material type</Label>
+                      <Select value={inputs.matType ?? "MS"} onValueChange={(v) => handleStr("matType", v)}>
+                        <SelectTrigger data-testid="select-mat-type"><SelectValue /></SelectTrigger>
+                        <SelectContent side="bottom">
+                          {MATERIAL_TYPES.map((m) => (
+                            <SelectItem key={m} value={m}>{m}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+
+                {isHwfast && (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-primary font-bold">Type</Label>
+                      <Select value={inputs.hwType ?? ""} onValueChange={(v) => handleStr("hwType", v)}>
+                        <SelectTrigger className="border-primary/50" data-testid="select-hwtype"><SelectValue placeholder="Select type…" /></SelectTrigger>
+                        <SelectContent side="bottom">
+                          {(spec.ratios.type_options ?? []).map((o: any) => (
+                            <SelectItem key={o.type} value={o.type}>{o.type}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Make</Label>
+                      <Select value={inputs.make ?? ""} onValueChange={(v) => handleStr("make", v)}>
+                        <SelectTrigger data-testid="select-make"><SelectValue placeholder="Select make…" /></SelectTrigger>
+                        <SelectContent side="bottom">
+                          {HWFAST_MAKES.map((m) => (
+                            <SelectItem key={m} value={m}>{m}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Grade</Label>
+                      <Select value={inputs.grade ?? ""} onValueChange={(v) => handleStr("grade", v)}>
+                        <SelectTrigger data-testid="select-grade"><SelectValue placeholder="Select grade…" /></SelectTrigger>
+                        <SelectContent side="bottom">
+                          {GRADE_OPTIONS.map((g) => (
+                            <SelectItem key={g} value={g}>{g}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+
+                {isRailc && (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-primary font-bold">Steel section</Label>
+                      <Select value={inputs.section ?? ""} onValueChange={(v) => handleStr("section", v)}>
+                        <SelectTrigger className="border-primary/50" data-testid="select-section"><SelectValue placeholder="Select section…" /></SelectTrigger>
+                        <SelectContent side="bottom">
+                          {(spec.ratios.sections ?? []).map((s: any) => (
+                            <SelectItem key={s.section} value={s.section}>{s.section}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Make</Label>
+                      <Select value={inputs.make ?? ""} onValueChange={(v) => handleStr("make", v)}>
+                        <SelectTrigger data-testid="select-make"><SelectValue placeholder="Select make…" /></SelectTrigger>
+                        <SelectContent side="bottom">
+                          {railcMakes.map((m) => (
+                            <SelectItem key={m} value={m}>{m}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Material type</Label>
+                      <Select value={inputs.matType ?? "MS"} onValueChange={(v) => handleStr("matType", v)}>
+                        <SelectTrigger data-testid="select-mat-type"><SelectValue /></SelectTrigger>
+                        <SelectContent side="bottom">
+                          {MATERIAL_TYPES.map((m) => (
+                            <SelectItem key={m} value={m}>{m}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+
+                {isManual && (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-primary font-bold">RM price (₹/MT)</Label>
+                      <Input
+                        type="number"
+                        value={inputs.manualRM ?? 0}
+                        onChange={(e) => handleNum("manualRM", e.target.value)}
+                        className="font-mono border-primary/50"
+                        data-testid="input-manual-rm"
+                      />
+                      <p className="text-xs text-muted-foreground">Enter manually — no section-mix table for this sheet.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Material type</Label>
+                      <Select value={inputs.matType ?? "MS"} onValueChange={(v) => handleStr("matType", v)}>
+                        <SelectTrigger data-testid="select-mat-type"><SelectValue /></SelectTrigger>
+                        <SelectContent side="bottom">
+                          {MATERIAL_TYPES.map((m) => (
+                            <SelectItem key={m} value={m}>{m}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -717,7 +881,7 @@ export default function Calculator() {
                     <div className="flex justify-between"><span className="text-muted-foreground">Customer</span><span className="font-medium">{customers?.find((c) => c.id.toString() === customerId)?.name}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Project Ref</span><span className="font-mono">{projectRef}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Structure</span><span className="font-medium">{structureType.trim()} {kvOption ? `(${kvOption})` : ""}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Make / Grade</span><span className="font-medium">{inputs.make} / {inputs.matType}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">{isHwfast ? "Make / Grade" : "Make / Material"}</span><span className="font-medium">{isManual ? "Manual RM" : inputs.make} / {isHwfast ? (inputs.grade ?? "") : (inputs.matType ?? "")}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Revision</span><span className="font-mono text-primary font-bold">Rev {nextRevision}</span></div>
                   </CardContent>
                 </Card>

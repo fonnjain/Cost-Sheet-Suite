@@ -15,10 +15,21 @@ internal `Tested`/`TESTED` supplier tags. The engine's `pickRMPriceForCategory`
 matches on the FULL tag (or any `/`-split part), so passing the full `PG/NTPC` /
 `MAIN/BSEN` string prices correctly — the fragmentation only ever hurt the UI.
 
-**How to apply:** When wiring any new structure family into the calculator
-(Phase 2: Sub-Station (P), Fasteners/hwfast, Railways/railc, etc.), define its
-dropdowns (Make, Voltage, Grade, weight band, scrap %, proto %) from that
-family's source lists in the acceptance spec, and pass the full make string to
-the engine. `RSJ Pole - Base Plate ` is `tlt5` schema so it reuses the TLT
-Make/Voltage/Grade UI verbatim; the genuinely different families (fasteners,
-railways) are not yet exposed in the UI.
+**How to apply:** When wiring any new structure family into the calculator,
+define its dropdowns (Make, Voltage, Grade, weight band, scrap %, proto %) from
+that family's source lists in the acceptance spec, and pass the full make string
+to the engine. `RSJ Pole - Base Plate ` is `tlt5` schema so it reuses the TLT
+Make/Voltage/Grade UI verbatim.
+
+**Exception — Railways (`railc`) Make list:** the Railways family deliberately
+uses the full `getDistinctMakes(rm)` list (default `CORE`) per an explicit user
+decision, NOT a curated source list. This is the one place the fragmentation
+caveat above is accepted, because Railways supplier tags are single-token and do
+not fragment. Treat this as an intentional, user-approved deviation.
+
+**Schemas currently exposed in the calculator UI:** kv-style families (TLT,
+Sub-Station, RSJ-BP, etc.), `hwfast` (Fasteners, Foundation Bolts → Type/Make/
+Grade, Grade recorded-only), `railc` (RLY-Mast/Portal/SPS/Sp.Masts → Section/
+Make/matType), `misc`/manual schemas (RLY-Drop Tubes, RLY-BFBRSJ → manual RM
+price input). Grade/hwType/section/manualRM are recorded-only and never feed the
+cost math.

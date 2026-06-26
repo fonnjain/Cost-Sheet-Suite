@@ -73,6 +73,12 @@ export function toLegacyShape(
     // Material selectors (kv is also stored as the top-level kvOption column).
     make: i.make ?? "",
     matType: i.matType ?? "",
+    // Schema-specific selectors, captured for the record. Grade is recorded
+    // only and never feeds the cost (faithful to v6).
+    grade: i.grade ?? "",
+    hwType: i.hwType ?? "",
+    section: i.section ?? "",
+    manualRM: +i.manualRM || 0,
   };
 
   for (const [v6Id, legacyId] of Object.entries(CREDIT_ID_MAP)) {
