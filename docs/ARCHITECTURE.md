@@ -275,7 +275,7 @@ typecheck:libs` before checking the leaf artifact packages.
   a random 30-day session token is issued, stored in the `sessions` table, sent
   as `Authorization: Bearer <token>`, and persisted in `localStorage`.
 - Twice-monthly RM window: the twice-monthly RM panel (plates, coils) is locked
-  unless today is the 1st or 15th of the month, or an admin has explicitly
+  unless today is the 1st or 16th of the month, or an admin has explicitly
   unlocked it via the admin panel.
 - Quote auto-revisioning: revisions auto-increment per
   `(customerId, projectRef)`; approval is mutually exclusive per project.
