@@ -1,0 +1,365 @@
+# Vijay Transmission Cost Sheet Suite — Architecture
+
+This document describes how the project is structured and how the pieces fit
+together. It is intended for anyone new to the codebase who needs to understand
+the system end to end. All file paths are relative to the repository root.
+
+## 1. System overview and purpose
+
+The suite is a mobile-first internal costing tool for a power transmission steel
+fabricator. Field engineers use it to:
+
+1. Maintain raw-material (RM) prices in a console.
+2. Enter project information and select a structure type.
+3. Configure a full cost build-up and see the per-tonne quote price update live.
+4. Save quotes (with automatic revision tracking) and review/approve historical
+   revisions per client and project.
+
+A dashboard surfaces KPIs and charts over saved quotes. The application is dark
+mode only (navy `#0e1f33` background, red `#e63329` accent), uses Sora for UI
+text and Space Mono for numbers, formats numbers in the Indian locale
+(`₹1,23,456`), and uses no emojis in the UI.
+
+Authentication is email-only against an allowlist — there are no passwords.
+
+## 2. Tech stack
+
+- Monorepo: pnpm workspaces, Node.js 24, TypeScript 5.9.
+- Frontend: React 19 + Vite + Tailwind CSS + shadcn/ui (Radix primitives) +
+  wouter for routing. Charts use Recharts. PDF export uses jspdf and
+  jspdf-autotable.
+- Server state / data fetching: TanStack Query (React Query).
+- API: Express 5.
+- Database: PostgreSQL with Drizzle ORM.
+- Validation: Zod (`zod/v4`) and `drizzle-zod`.
+- API codegen: Orval, generating React Query hooks and Zod schemas from a single
+  OpenAPI spec.
+- API build: esbuild (ESM bundle).
+- Logging (server): pino / pino-http.
+
+## 3. Monorepo layout
+
+```
+artifacts/                 Deployable applications
+  cost-sheet/              React + Vite frontend (web, served at /)
+  api-server/              Express 5 API (served at /api)
+  mockup-sandbox/          Design/preview tool (not part of the product runtime)
+lib/                       Shared libraries
+  api-spec/                openapi.yaml (source of truth) + Orval config
+  api-client-react/        Generated React Query hooks + custom fetch mutator
+  api-zod/                 Generated Zod schemas (request/response validation)
+  db/                      Drizzle schema, client, and exports
+scripts/                   Utility scripts (@workspace/scripts), e.g. seeding
+pnpm-workspace.yaml        Workspace package discovery, catalog pins
+tsconfig.base.json         Shared strict TS defaults
+tsconfig.json              Root solution config for composite libs only
+package.json               Root task orchestration
+```
+
+Conventions (see the `pnpm-workspace` skill for full detail):
+
+- `lib/*` packages are composite and emit declarations via `tsc --build`.
+- `artifacts/*` and `scripts` are leaf packages typechecked with `tsc --noEmit`.
+  They never import from each other; shared code lives in a `lib/*` package.
+- A global reverse proxy routes traffic by path. Each artifact declares its
+  routing in `.replit-artifact/artifact.toml`. The API server owns `/api`; the
+  frontend owns `/`. Paths are not rewritten, so each service handles its own
+  full base path.
+
+### Package dependency graph
+
+```
+                         lib/api-spec (openapi.yaml)
+                                  │  orval codegen
+                 ┌────────────────┴────────────────┐
+                 ▼                                  ▼
+      lib/api-client-react                      lib/api-zod
+        (React Query hooks)                   (Zod schemas)
+                 │                                  │
+                 ▼                                  ▼
+       artifacts/cost-sheet               artifacts/api-server ──► lib/db
+        (React frontend)                     (Express API)      (Drizzle/PG)
+```
+
+The frontend depends on `@workspace/api-client-react`. The API server depends on
+`@workspace/api-zod` and `@workspace/db`. Both generated libraries are produced
+from `lib/api-spec/openapi.yaml`, which is the contract that keeps the two sides
+in sync.
+
+## 4. Frontend architecture (`artifacts/cost-sheet`)
+
+### Routing and pages
+
+Routing uses wouter, mounted under the Vite base path
+(`import.meta.env.BASE_URL`). See `src/App.tsx`. Routes:
+
+- `/login` — `src/pages/login.tsx`: email-only sign-in.
+- `/` — `src/pages/home.tsx`: landing / step navigation.
+- `/rm-prices` — `src/pages/rm-prices.tsx`: RM prices console (daily and
+  twice-monthly panels, window lock, admin unlock).
+- `/calculator` — `src/pages/calculator.tsx`: project info, structure picker,
+  full cost build-up, save quote.
+- `/dashboard` — `src/pages/dashboard.tsx`: KPIs and charts.
+- `/review` — `src/pages/review.tsx`: compare all revisions for a
+  client + project; approve a revision; legacy-quote messaging.
+- `/admin` — `src/pages/admin.tsx`: user management and twice-monthly window
+  unlock (admin only).
+- Fallback — `src/pages/not-found.tsx`.
+
+All non-login routes render inside `src/components/layout.tsx`.
+
+### Server state and data fetching
+
+Data fetching is done with TanStack Query through the generated hooks in
+`@workspace/api-client-react`. The `QueryClient` (in `src/App.tsx`) is configured
+to skip retries on `401`/`403` responses and uses a 30-second stale time.
+
+### Authentication / token handling
+
+- The session token is stored in `localStorage` under the key
+  `vt_session_token`. See `src/lib/auth.ts`.
+- `src/lib/auth.ts` registers a token getter with the generated client via
+  `setAuthTokenGetter`. The custom fetch mutator
+  (`lib/api-client-react/src/custom-fetch.ts`) then attaches
+  `Authorization: Bearer <token>` to every request when no explicit
+  Authorization header is present.
+- On login the token is stored and the getter re-initialized; on logout the token
+  is cleared and the getter removed.
+
+### Cost-calculation engine
+
+The full cost build-up is computed in the browser in real time. There are two
+relevant modules:
+
+- `src/lib/v6/` — the faithful port of the v6 workbook engine, used for new
+  quotes:
+  - `data.ts` — auto-generated, embedded source-of-truth data extracted from the
+    v6 workbook: `BILLET_FULL`, `RM_FULL`, `INITIAL_DATA`, `MASTER_SPECS`, and
+    `STRUCTURE_FAMILIES`. Do not edit by hand.
+  - `engine.ts` — an Excel-style formula evaluator (supports `+`, `AVERAGE`,
+    cell and cross-sheet references, and overrides applied to Billet-sheet
+    cells) plus the RM-data parsing and the cost-sheet math: `buildRMData`,
+    `pickRMPriceForCategory`, `calculateRMPrice`, `calculateCostSheet`, and
+    `buildDefaultInputs`. It reproduces the v6 numbers to the rupee.
+  - `legacy.ts` — `toLegacyShape` maps the v6 engine's `CostResults` and
+    v6-keyed inputs into the flat, camelCase storage shape (`legacyInputs` +
+    `legacyCostBreakdown`) that the dashboard, review, and PDF-export pages read.
+    New quotes are computed by the v6 engine but persisted in this stable shape
+    so all downstream display code keeps working.
+- `src/lib/costCalculator.ts` — a placeholder/legacy generic calculator. Its
+  `formatINR` helper is still used elsewhere in the UI for Indian-locale
+  currency formatting.
+
+Only the final result plus the inputs are stored in the database; the
+calculation itself is not run on the server.
+
+## 5. API architecture (`artifacts/api-server`)
+
+### Application setup
+
+`src/index.ts` reads `PORT` (required) and starts the server. `src/app.ts`
+configures the Express app: pino-http request logging, `cors`,
+`express.json`, `express.urlencoded`, and mounts the combined router under
+`/api`. `src/routes/index.ts` composes the per-feature routers.
+
+### Route groups
+
+Handlers that accept a request body, params, or query generally validate it with
+the generated Zod schemas from `@workspace/api-zod`, and require authentication
+via middleware unless noted.
+
+- `src/routes/health.ts` — `GET /api/healthz` (no auth).
+- `src/routes/auth.ts`:
+  - `POST /api/auth/login` (no auth) — email lookup against the allowlist;
+    issues a 30-day session token.
+  - `POST /api/auth/logout` — deletes the session row matching the
+    `X-Session-Token` header. Note: `requireAuth` authenticates primarily via the
+    `Authorization: Bearer` header, and the generated client does not send
+    `X-Session-Token`, so a Bearer-authenticated logout can return success
+    without deleting the underlying session row (it then expires naturally). This
+    is a known limitation rather than intended behavior.
+  - `GET /api/auth/me` — current user.
+- `src/routes/users.ts` (admin only) — `GET/POST /api/users`,
+  `PATCH/DELETE /api/users/:id`.
+- `src/routes/customers.ts` — `GET/POST /api/customers`.
+- `src/routes/rm-prices.ts`:
+  - `GET /api/rm-prices` — latest RM prices; `isWindowUnlocked` is true when
+    today is the 1st or 15th, or when an admin has explicitly unlocked it.
+  - `POST /api/rm-prices` — save a new RM-price snapshot.
+  - `GET /api/rm-prices/history` — last 30 snapshots.
+  - `POST /api/rm-prices/unlock-twice-monthly` (admin only) — unlock the window.
+- `src/routes/quotes.ts`:
+  - `GET /api/quotes` — list with optional `customerId` / `projectRef` filters.
+  - `POST /api/quotes` — create; auto-assigns the next revision (see below).
+  - `GET /api/quotes/by-project` — all revisions for a customer + project.
+  - `POST /api/quotes/:id/approve` — mark one revision approved; runs in a
+    transaction that clears the approved flag on all sibling revisions first so
+    exactly one revision per customer + project is approved.
+  - `GET /api/quotes/:id` — single quote.
+  - `GET /api/review/projects` — distinct project refs for a customer.
+- `src/routes/dashboard.ts` — `GET /api/dashboard/summary`,
+  `/recent-quotes`, `/quotes-by-structure`, `/quotes-by-user`.
+
+### Auth middleware (`src/middlewares/auth.ts`)
+
+- `requireAuth` extracts the bearer token (from `Authorization: Bearer <token>`,
+  with `X-Session-Token` as a fallback), validates a non-expired session,
+  confirms the user exists and is active, and attaches `userId`, `userRole`, and
+  `userName` to the request.
+- `requireAdmin` requires `userRole === "admin"` (returns `403` otherwise).
+
+## 6. Database schema (`lib/db`)
+
+The Drizzle client is created in `lib/db/src/index.ts` from a `pg` pool using
+`DATABASE_URL`; the schema is re-exported from `lib/db/src/schema/`. Tables:
+
+- `users` (`schema/users.ts`): `id` (serial PK), `email` (unique), `name`,
+  `role` (default `user`), `isActive` (default true), `createdAt`, `updatedAt`.
+- `sessions` (`schema/sessions.ts`): `token` (PK), `userId`, `createdAt`,
+  `expiresAt`. A session references a user by `userId`.
+- `customers` (`schema/customers.ts`): `id` (serial PK), `name` (unique),
+  `createdAt`.
+- `rm_prices` (`schema/rm_prices.ts`): `id` (serial PK), `dailyData` (jsonb),
+  `twiceMonthlyData` (jsonb), `createdByName`, `isWindowUnlocked` (default
+  false), `createdAt`. Each row is a point-in-time RM-price snapshot.
+- `quotes` (`schema/quotes.ts`): `id` (serial PK), `customerId`, `customerName`
+  (denormalized for query performance), `projectRef`, `revision` (default 0),
+  `structureType`, `kvOption`, `quotePricePerMt`, `totalCost`, `steelPrice`,
+  `zincPrice`, `inputs` (jsonb), `costBreakdown` (jsonb), `generatedByName`,
+  `notes`, `approved` (default false), `approvedAt`, `approvedByName`, `legacy`
+  (default false), `createdAt`.
+
+Relationships are expressed by ID columns (`sessions.userId -> users.id`,
+`quotes.customerId -> customers.id`) rather than enforced foreign keys in the
+schema files. `customerName` is denormalized onto quotes to avoid joins on the
+hot read paths (lists, dashboard aggregations).
+
+### Revision logic
+
+On `POST /api/quotes`, the server finds the highest existing `revision` for the
+`(customerId, projectRef)` pair and inserts the next one. The first quote for a
+project is Rev 0; subsequent saves are Rev 1, Rev 2, and so on. Approval is
+mutually exclusive per `(customerId, projectRef)`.
+
+### Legacy flagging
+
+Quotes computed by the pre-reconciliation engine carry `legacy = true` and are
+shown read-only in the review page with a "computed on previous logic" note. New
+quotes default to `legacy = false`.
+
+## 7. Contract-first API and codegen
+
+`lib/api-spec/openapi.yaml` is the single source of truth for the API contract
+(`info.title` is `Api`, which controls generated filenames — do not change it).
+
+Codegen is driven by `lib/api-spec/orval.config.ts` and run with:
+
+```
+pnpm --filter @workspace/api-spec run codegen
+```
+
+This produces two outputs:
+
+- `lib/api-client-react/src/generated/` — React Query hooks (split mode,
+  `react-query` client, base URL `/api`) wired to the `customFetch` mutator in
+  `lib/api-client-react/src/custom-fetch.ts`. The frontend consumes these hooks.
+- `lib/api-zod/src/generated/` — Zod schemas (request bodies, params, query, and
+  responses). The API server imports these to validate inputs and outputs.
+
+Workflow: edit `openapi.yaml`, run codegen, then update server handlers and
+frontend usage. After changes to any `lib/*` package, run `pnpm run
+typecheck:libs` before checking the leaf artifact packages.
+
+## 8. Key architecture decisions
+
+- Email-only auth: no passwords. Login is an email lookup against an allowlist;
+  a random 30-day session token is issued, stored in the `sessions` table, sent
+  as `Authorization: Bearer <token>`, and persisted in `localStorage`.
+- Twice-monthly RM window: the twice-monthly RM panel (plates, coils) is locked
+  unless today is the 1st or 15th of the month, or an admin has explicitly
+  unlocked it via the admin panel.
+- Quote auto-revisioning: revisions auto-increment per
+  `(customerId, projectRef)`; approval is mutually exclusive per project.
+- Client-side calculation with a stable storage shape: the full cost build-up is
+  computed in the browser by the v6 engine, then mapped via `toLegacyShape`
+  into a flat shape before storage so display code stays stable. Only the final
+  result and inputs are persisted.
+- Legacy quote flagging: older quotes are flagged and rendered read-only with a
+  note, keeping revision history intact while new quotes use the corrected
+  engine.
+- Contract-first API: OpenAPI is authoritative; client hooks and server Zod
+  schemas are generated from it.
+
+## 9. End-to-end request flow
+
+1. The user signs in at `/login`. `POST /api/auth/login` validates the email
+   against the allowlist and returns a user plus a session token.
+2. The frontend stores the token in `localStorage` (`vt_session_token`) and
+   registers the token getter so the custom fetch mutator attaches
+   `Authorization: Bearer <token>` to subsequent requests.
+3. Authenticated data fetches (RM prices, customers, quotes, dashboard) go
+   through generated React Query hooks; `requireAuth` validates the session and
+   attaches user context on the server.
+4. On the calculator, RM prices are loaded, the v6 engine computes the cost
+   build-up live in the browser, and the user reviews the quote.
+5. Saving a quote calls `POST /api/quotes`. The server assigns the next revision
+   for the customer + project and persists the inputs and cost breakdown.
+6. On the review page, the user compares all revisions for a customer + project
+   and can approve one revision (`POST /api/quotes/:id/approve`), which clears
+   approval on sibling revisions in a transaction.
+
+```
+Browser (cost-sheet)                          API server                    PostgreSQL
+   │  POST /api/auth/login (email)  ─────────►  validate allowlist  ───────►  users
+   │  ◄──── user + token ───────────────────   create session      ───────►  sessions
+   │  store token in localStorage
+   │  GET /api/rm-prices  (Bearer token) ────►  requireAuth ► query  ───────►  rm_prices
+   │  compute quote locally (v6 engine)
+   │  POST /api/quotes  (Bearer token)   ────►  next revision ► insert ─────►  quotes
+   │  POST /api/quotes/:id/approve       ────►  transaction (clear+set) ────►  quotes
+```
+
+## 10. Build, run, and operate
+
+Run during development (each via its workflow / pnpm filter):
+
+- API server: `pnpm --filter @workspace/api-server run dev` (reads `PORT`,
+  proxied at `/api`).
+- Frontend: `pnpm --filter @workspace/cost-sheet run dev` (proxied at `/`).
+
+Quality and build:
+
+- Typecheck everything: `pnpm run typecheck` (builds composite libs first via
+  `tsc --build`, then typechecks leaf artifact/script packages).
+- Typecheck libs only: `pnpm run typecheck:libs`.
+- Build all: `pnpm run build` (typecheck, then `pnpm -r run build`). The API
+  bundles with esbuild via `artifacts/api-server/build.mjs` (ESM output to
+  `dist/`); the frontend builds with Vite.
+
+Codegen and data:
+
+- Regenerate API hooks and Zod schemas:
+  `pnpm --filter @workspace/api-spec run codegen`.
+- Push DB schema changes (dev only): `pnpm --filter @workspace/db run push`.
+- Seed users, initial RM prices, and customers:
+  `pnpm --filter @workspace/scripts run seed`.
+
+Required environment (enforced at runtime):
+
+- `DATABASE_URL` — PostgreSQL connection string (required by `lib/db/src/index.ts`).
+- `PORT` — provided by the workflow for the API server (required by
+  `artifacts/api-server/src/index.ts`).
+
+`SESSION_SECRET` is present as a project secret but is not currently read by the
+application code; session tokens are random values stored in the `sessions`
+table.
+
+Deployment: the suite deploys behind the shared path-based reverse proxy, with
+the API on `/api` and the frontend on `/`. Use the Replit deployment workflow to
+publish; published apps are served over HTTPS on the configured domains.
+
+## 11. Pointers
+
+- `replit.md` — project overview, user preferences, allowed users, and gotchas.
+- The `pnpm-workspace` skill — workspace structure, TypeScript project
+  references, codegen conventions, and proxy routing.
