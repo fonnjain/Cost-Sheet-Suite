@@ -267,6 +267,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
 
+  /rm-prices/toggle-daily-lock:
+    post:
+      operationId: toggleDailyLock
+      tags: [rmPrices]
+      summary: Admin lock/unlock RM file inputs for today
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DailyLockInput"
+      responses:
+        "200":
+          description: Daily lock state updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
   /rm-offsets:
     get:
       operationId: getRmOffsets

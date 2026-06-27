@@ -26,3 +26,13 @@ The cost-sheet `QueryClient` (in `artifacts/cost-sheet/src/App.tsx`) sets a 30-s
 **Why:** real bug — on schedule days the toggle appeared broken because the effective flag was always true.
 
 **How to apply:** schedule-open (`isWindowUnlocked && !isWindowOverride`) → disable the toggle, show "Open by Schedule". The toggle endpoint `POST /api/rm-prices/unlock-twice-monthly` takes an optional `{ unlocked: boolean }` body (defaults to true for backward compat) and sets the override on the latest snapshot.
+
+## Daily RM lock (distinct from twice-monthly window)
+
+A separate admin lock toggles ALL RM file inputs (daily + twice-monthly) + saving off for the current day; auto-reopens next day. Do NOT conflate with the twice-monthly window override — they are independent flags (`isDailyLocked` vs `isWindowOverride`/`isWindowUnlocked`).
+
+**Design:** append-only `rm_daily_locks` table; latest row wins. Lock = insert `lockedDate = today`; unlock = insert `lockedDate = null`. `isDailyLocked = latest && latest.lockedDate === todayKey()`. Auto-reopen is free because yesterday's date != today.
+
+**Why date-keyed instead of a boolean:** a stored boolean would not auto-expire; the date comparison gives "opens next day" with no scheduled job.
+
+**How to apply:** enforce the lock server-side (403 on `POST /rm-prices`), not just by disabling UI inputs. `todayKey()` uses server LOCAL date components to stay consistent with `isTwiceMonthlyWindow()` (also local `getDate()`).

@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
-import { Upload, Save, CheckCircle, AlertTriangle, Calculator as CalcIcon } from "lucide-react";
+import { Upload, Save, CheckCircle, AlertTriangle, Calculator as CalcIcon, Lock } from "lucide-react";
 import { INITIAL_DATA } from "@/lib/v6/data";
 import type { InitialCell } from "@/lib/v6/data";
 import { buildRMData, computeAutoOverrides, DEFAULT_OFFSETS, getDistinctMakes, pickRMPriceForCategory } from "@/lib/v6/engine";
@@ -124,6 +124,9 @@ export default function RmPrices() {
   // The window is open only when the server says so: automatically on the 1st or
   // 16th of the month, or after an admin explicitly unlocks it from the Admin panel.
   const isWindowOpen = !!rmPrices?.isWindowUnlocked;
+  // When an admin locks the RM file for the day, all inputs and saving are
+  // disabled for everyone until the next day (auto-reopens).
+  const isDailyLocked = !!rmPrices?.isDailyLocked;
 
   useEffect(() => {
     if (rmPrices) {
@@ -259,6 +262,7 @@ export default function RmPrices() {
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
             className="gap-2"
+            disabled={isDailyLocked}
             data-testid="button-import-rm"
           >
             <Upload className="h-4 w-4" />
@@ -273,7 +277,7 @@ export default function RmPrices() {
           />
           <Button
             onClick={() => setShowVerify(true)}
-            disabled={saveRmPrices.isPending}
+            disabled={saveRmPrices.isPending || isDailyLocked}
             className="font-bold gap-2"
             data-testid="button-save-rm"
           >
@@ -282,6 +286,13 @@ export default function RmPrices() {
           </Button>
         </div>
       </div>
+
+      {isDailyLocked && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-500">
+          <Lock className="h-4 w-4 shrink-0" />
+          RM file inputs are locked for today. They reopen automatically tomorrow, or an admin can unlock them from the Admin panel.
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Daily Inputs */}
@@ -308,7 +319,8 @@ export default function RmPrices() {
                           type="number"
                           value={dailyData[item.key] ?? item.default}
                           onChange={(e) => handleDailyChange(item.key, e.target.value)}
-                          className="pl-7 font-mono bg-background focus:bg-card transition-colors"
+                          disabled={isDailyLocked}
+                          className="pl-7 font-mono bg-background focus:bg-card transition-colors disabled:opacity-50"
                           data-testid={`input-daily-${item.key}`}
                         />
                       </div>
@@ -353,7 +365,7 @@ export default function RmPrices() {
                           type="number"
                           value={twiceMonthlyData[item.key] ?? item.default}
                           onChange={(e) => handleTwiceMonthlyChange(item.key, e.target.value)}
-                          disabled={!isWindowOpen}
+                          disabled={!isWindowOpen || isDailyLocked}
                           className="pl-7 font-mono bg-background focus:bg-card transition-colors disabled:opacity-50"
                           data-testid={`input-twice-${item.key}`}
                         />
@@ -526,7 +538,7 @@ export default function RmPrices() {
             <Button variant="outline" onClick={() => setShowVerify(false)}>Cancel</Button>
             <Button
               onClick={handleSaveConfirmed}
-              disabled={saveRmPrices.isPending}
+              disabled={saveRmPrices.isPending || isDailyLocked}
               className="font-bold gap-2"
               data-testid="button-confirm-save"
             >

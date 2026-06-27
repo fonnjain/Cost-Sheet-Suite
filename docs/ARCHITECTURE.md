@@ -194,15 +194,24 @@ via middleware unless noted.
     effective state (true when today is the 1st or 16th, OR an admin has
     overridden it); `isWindowOverride` is the raw stored admin flag, exposed
     separately so the admin toggle reflects the override independently of the
-    schedule. The response also fetches the latest row from `rm_offsets` in
-    parallel and embeds `offsetData` for consumers that need it alongside prices.
-  - `POST /api/rm-prices` — save a new RM-price snapshot.
+    schedule. `isDailyLocked` is true when an admin has locked the RM file for
+    today (see daily lock below). The response also fetches the latest row from
+    `rm_offsets` in parallel and embeds `offsetData` for consumers that need it
+    alongside prices.
+  - `POST /api/rm-prices` — save a new RM-price snapshot. Returns 403 when the
+    RM file is daily-locked, so the lock is enforced server-side, not just in UI.
   - `GET /api/rm-prices/history` — last 30 snapshots.
   - `POST /api/rm-prices/unlock-twice-monthly` (admin only) — toggle the
     twice-monthly window override. Accepts an optional `{ unlocked: boolean }`
     body (validated by `WindowToggleInput`); defaults to `true` (unlock) when
     omitted, for backward compatibility. Sets `isWindowUnlocked` on the latest
     snapshot, so admins can both open and re-lock the window.
+  - `POST /api/rm-prices/toggle-daily-lock` (admin only) — lock/unlock all RM
+    file inputs for today. Accepts `{ locked: boolean }` (validated by
+    `DailyLockInput`). Appends a row to `rm_daily_locks` with `lockedDate` set to
+    today's key when locking, or `null` when unlocking. The lock auto-clears the
+    next day because `isDailyLocked` only holds when the latest lock row's
+    `lockedDate` equals today.
 - `src/routes/rm-offsets.ts`:
   - `GET /api/rm-offsets` — returns the latest `offsetData` object (keyed by
     cell ref, e.g. `{ "E9": 4000, ... }`); returns `{}` when no row exists.
@@ -305,6 +314,11 @@ typecheck:libs` before checking the leaf artifact packages.
 - Twice-monthly RM window: the twice-monthly RM panel (plates, coils) is locked
   unless today is the 1st or 16th of the month, or an admin has explicitly
   unlocked it via the admin panel.
+- Daily RM lock: an admin can lock the entire RM file (daily + twice-monthly
+  inputs and saving) for the current day via the admin panel; it reopens
+  automatically the next day. Independent of the twice-monthly window; enforced
+  both in the UI (disabled inputs/save + banner) and server-side (403 on save).
+  Backed by the append-only `rm_daily_locks` table, read latest-row-wins.
 - Quote auto-revisioning: revisions auto-increment per
   `(customerId, projectRef)`; approval is mutually exclusive per project.
 - Client-side calculation with a stable storage shape: the full cost build-up is

@@ -23,6 +23,7 @@ import type {
   AuthResponse,
   Customer,
   CustomerInput,
+  DailyLockInput,
   DashboardSummary,
   ErrorResponse,
   GetProjectsByCustomerParams,
@@ -1084,6 +1085,77 @@ export const useUnlockTwiceMonthly = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUnlockTwiceMonthlyMutationOptions(options));
+    }
+
+export const getToggleDailyLockUrl = () => {
+
+
+
+
+  return `/api/rm-prices/toggle-daily-lock`
+}
+
+/**
+ * @summary Admin lock/unlock RM file inputs for today
+ */
+export const toggleDailyLock = async (dailyLockInput: DailyLockInput, options?: RequestInit): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getToggleDailyLockUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dailyLockInput,)
+  }
+);}
+
+
+
+
+export const getToggleDailyLockMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleDailyLock>>, TError,{data: BodyType<DailyLockInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof toggleDailyLock>>, TError,{data: BodyType<DailyLockInput>}, TContext> => {
+
+const mutationKey = ['toggleDailyLock'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof toggleDailyLock>>, {data: BodyType<DailyLockInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  toggleDailyLock(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ToggleDailyLockMutationResult = NonNullable<Awaited<ReturnType<typeof toggleDailyLock>>>
+    export type ToggleDailyLockMutationBody = BodyType<DailyLockInput>
+    export type ToggleDailyLockMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Admin lock/unlock RM file inputs for today
+ */
+export const useToggleDailyLock = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleDailyLock>>, TError,{data: BodyType<DailyLockInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof toggleDailyLock>>,
+        TError,
+        {data: BodyType<DailyLockInput>},
+        TContext
+      > => {
+      return useMutation(getToggleDailyLockMutationOptions(options));
     }
 
 export const getGetRmOffsetsUrl = () => {

@@ -104,6 +104,8 @@ export interface RmPrices {
   isWindowUnlocked: boolean;
   /** Raw admin override flag on the latest snapshot, independent of the schedule. Drives the admin lock/unlock toggle. */
   isWindowOverride?: boolean;
+  /** True when an admin has locked RM file inputs for today. Auto-clears the next day. */
+  isDailyLocked?: boolean;
 }
 
 export type RmPricesInputDailyData = { [key: string]: unknown };
@@ -134,6 +136,11 @@ export interface RmOffsetsInput {
 export interface WindowToggleInput {
   /** Desired window state. Defaults to true (unlock) for backward compatibility. */
   unlocked?: boolean;
+}
+
+export interface DailyLockInput {
+  /** True to lock RM file inputs for today, false to unlock. */
+  locked: boolean;
 }
 
 /**

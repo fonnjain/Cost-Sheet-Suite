@@ -20,4 +20,6 @@ export interface RmPrices {
   isWindowUnlocked: boolean;
   /** Raw admin override flag on the latest snapshot, independent of the schedule. Drives the admin lock/unlock toggle. */
   isWindowOverride?: boolean;
+  /** True when an admin has locked RM file inputs for today. Auto-clears the next day. */
+  isDailyLocked?: boolean;
 }

@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { rmPricesTable, rmOffsetsTable } from "@workspace/db/schema";
+import { rmPricesTable, rmOffsetsTable, rmDailyLocksTable } from "@workspace/db/schema";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
-import { SaveRmPricesBody, UnlockTwiceMonthlyBody } from "@workspace/api-zod";
+import { SaveRmPricesBody, UnlockTwiceMonthlyBody, ToggleDailyLockBody } from "@workspace/api-zod";
 
 const router = Router();
 
@@ -24,6 +24,23 @@ function isTwiceMonthlyWindow(): boolean {
   return day === 1 || day === 16;
 }
 
+function todayKey(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+async function isDailyLockedToday(): Promise<boolean> {
+  const [latest] = await db
+    .select()
+    .from(rmDailyLocksTable)
+    .orderBy(desc(rmDailyLocksTable.createdAt))
+    .limit(1);
+  return !!latest && latest.lockedDate === todayKey();
+}
+
 async function getLatestOffsetData(): Promise<Record<string, number>> {
   const [latest] = await db
     .select()
@@ -39,6 +56,8 @@ router.get("/rm-prices", requireAuth, async (_req, res): Promise<void> => {
     getLatestOffsetData(),
   ]);
 
+  const dailyLocked = await isDailyLockedToday();
+
   if (!latest) {
     res.json({
       id: 0,
@@ -48,6 +67,7 @@ router.get("/rm-prices", requireAuth, async (_req, res): Promise<void> => {
       createdByName: "System",
       isWindowUnlocked: isTwiceMonthlyWindow(),
       isWindowOverride: false,
+      isDailyLocked: dailyLocked,
       createdAt: new Date().toISOString(),
     });
     return;
@@ -58,6 +78,7 @@ router.get("/rm-prices", requireAuth, async (_req, res): Promise<void> => {
     offsetData,
     isWindowUnlocked: isTwiceMonthlyWindow() || latest.isWindowUnlocked,
     isWindowOverride: latest.isWindowUnlocked,
+    isDailyLocked: dailyLocked,
   });
 });
 
@@ -65,6 +86,11 @@ router.post("/rm-prices", requireAuth, async (req, res): Promise<void> => {
   const parsed = SaveRmPricesBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  if (await isDailyLockedToday()) {
+    res.status(403).json({ error: "RM file inputs are locked for today. Try again tomorrow or ask an admin to unlock." });
     return;
   }
 
@@ -117,6 +143,24 @@ router.post("/rm-prices/unlock-twice-monthly", requireAuth, requireAdmin, async 
   res.json({
     success: true,
     message: unlocked ? "Twice-monthly window unlocked" : "Twice-monthly window locked",
+  });
+});
+
+router.post("/rm-prices/toggle-daily-lock", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  const parsed = ToggleDailyLockBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid request body" });
+    return;
+  }
+
+  await db.insert(rmDailyLocksTable).values({
+    lockedDate: parsed.data.locked ? todayKey() : null,
+    lockedByName: req.userName ?? "Unknown",
+  });
+
+  res.json({
+    success: true,
+    message: parsed.data.locked ? "RM file inputs locked for today" : "RM file inputs unlocked",
   });
 });
 

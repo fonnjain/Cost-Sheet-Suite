@@ -9,6 +9,7 @@
 export * from './authResponse';
 export * from './customer';
 export * from './customerInput';
+export * from './dailyLockInput';
 export * from './dashboardSummary';
 export * from './errorResponse';
 export * from './getProjectsByCustomerParams';

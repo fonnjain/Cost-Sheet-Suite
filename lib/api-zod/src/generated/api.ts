@@ -150,7 +150,8 @@ export const GetRmPricesResponse = zod.object({
   "createdAt": zod.string(),
   "createdByName": zod.string(),
   "isWindowUnlocked": zod.boolean().describe('Effective window state — true when today is the 1st\/16th OR the admin override is set.'),
-  "isWindowOverride": zod.boolean().optional().describe('Raw admin override flag on the latest snapshot, independent of the schedule. Drives the admin lock\/unlock toggle.')
+  "isWindowOverride": zod.boolean().optional().describe('Raw admin override flag on the latest snapshot, independent of the schedule. Drives the admin lock\/unlock toggle.'),
+  "isDailyLocked": zod.boolean().optional().describe('True when an admin has locked RM file inputs for today. Auto-clears the next day.')
 })
 
 
@@ -181,7 +182,8 @@ export const GetRmPricesHistoryResponseItem = zod.object({
   "createdAt": zod.string(),
   "createdByName": zod.string(),
   "isWindowUnlocked": zod.boolean().describe('Effective window state — true when today is the 1st\/16th OR the admin override is set.'),
-  "isWindowOverride": zod.boolean().optional().describe('Raw admin override flag on the latest snapshot, independent of the schedule. Drives the admin lock\/unlock toggle.')
+  "isWindowOverride": zod.boolean().optional().describe('Raw admin override flag on the latest snapshot, independent of the schedule. Drives the admin lock\/unlock toggle.'),
+  "isDailyLocked": zod.boolean().optional().describe('True when an admin has locked RM file inputs for today. Auto-clears the next day.')
 })
 export const GetRmPricesHistoryResponse = zod.array(GetRmPricesHistoryResponseItem)
 
@@ -194,6 +196,19 @@ export const UnlockTwiceMonthlyBody = zod.object({
 })
 
 export const UnlockTwiceMonthlyResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string().nullish()
+})
+
+
+/**
+ * @summary Admin lock/unlock RM file inputs for today
+ */
+export const ToggleDailyLockBody = zod.object({
+  "locked": zod.boolean().describe('True to lock RM file inputs for today, false to unlock.')
+})
+
+export const ToggleDailyLockResponse = zod.object({
   "success": zod.boolean(),
   "message": zod.string().nullish()
 })

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useListUsers, useUpdateUser, useDeleteUser, useUnlockTwiceMonthly, useGetRmPricesHistory, useGetRmPrices, getGetRmPricesQueryKey } from "@workspace/api-client-react";
+import { useListUsers, useUpdateUser, useDeleteUser, useUnlockTwiceMonthly, useToggleDailyLock, useGetRmPricesHistory, useGetRmPrices, getGetRmPricesQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -18,12 +18,14 @@ export default function Admin() {
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
   const unlockWindow = useUnlockTwiceMonthly();
+  const toggleDailyLock = useToggleDailyLock();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const isWindowOpen = !!rmPrices?.isWindowUnlocked;
   const isOverrideOn = !!rmPrices?.isWindowOverride;
   const isScheduleOpen = isWindowOpen && !isOverrideOn;
+  const isDailyLocked = !!rmPrices?.isDailyLocked;
 
   const handleToggleActive = async (id: number, isActive: boolean) => {
     try {
@@ -48,6 +50,22 @@ export default function Admin() {
     try {
       await deleteUser.mutateAsync({ id });
       toast({ title: "Deleted", description: "User deleted" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Error", description: e.message });
+    }
+  };
+
+  const handleToggleDailyLock = async () => {
+    const nextLocked = !isDailyLocked;
+    try {
+      await toggleDailyLock.mutateAsync({ data: { locked: nextLocked } });
+      await queryClient.invalidateQueries({ queryKey: getGetRmPricesQueryKey() });
+      toast({
+        title: nextLocked ? "Locked" : "Unlocked",
+        description: nextLocked
+          ? "RM file inputs are locked for today. They reopen automatically tomorrow."
+          : "RM file inputs are unlocked.",
+      });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     }
@@ -133,6 +151,43 @@ export default function Admin() {
         </Card>
 
         <div className="space-y-6">
+          <Card className="border-border/50 border-t-4 border-t-accent">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                {isDailyLocked ? (
+                  <Lock className="h-5 w-5 text-accent" />
+                ) : (
+                  <Unlock className="h-5 w-5 text-accent" />
+                )}
+                <CardTitle>Daily RM Lock</CardTitle>
+              </div>
+              <CardDescription>
+                {isDailyLocked
+                  ? "RM file inputs are locked for today. They reopen automatically tomorrow."
+                  : "Lock all RM file inputs for today. They reopen automatically tomorrow."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                onClick={handleToggleDailyLock}
+                disabled={toggleDailyLock.isPending}
+                className={
+                  isDailyLocked
+                    ? "w-full font-bold bg-muted hover:bg-muted/80 text-foreground border border-border"
+                    : "w-full font-bold bg-accent hover:bg-accent/90 text-accent-foreground"
+                }
+              >
+                {toggleDailyLock.isPending
+                  ? isDailyLocked
+                    ? "Unlocking..."
+                    : "Locking..."
+                  : isDailyLocked
+                    ? "Unlock RM Inputs"
+                    : "Lock RM Inputs Today"}
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card className="border-border/50 border-t-4 border-t-accent">
             <CardHeader>
               <div className="flex items-center gap-2">
