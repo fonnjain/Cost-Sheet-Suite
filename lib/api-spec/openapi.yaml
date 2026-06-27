@@ -606,6 +606,9 @@ components:
         isWindowOverride:
           type: boolean
           description: Raw admin override flag on the latest snapshot, independent of the schedule. Drives the admin lock/unlock toggle.
+        isDailyLocked:
+          type: boolean
+          description: True when an admin has locked RM file inputs for today. Auto-clears the next day.
 
     RmPricesInput:
       type: object
@@ -637,6 +640,14 @@ components:
         unlocked:
           type: boolean
           description: Desired window state. Defaults to true (unlock) for backward compatibility.
+
+    DailyLockInput:
+      type: object
+      required: [locked]
+      properties:
+        locked:
+          type: boolean
+          description: True to lock RM file inputs for today, false to unlock.
 
     Quote:
       type: object
