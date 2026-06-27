@@ -41,6 +41,34 @@ const ALL_DAILY_ITEMS = DAILY_GROUPS.flatMap((g) => g.items);
 const ALL_TWICE_ITEMS = TWICE_MONTHLY_GROUPS.flatMap((g) => g.items);
 const ALL_ITEMS = [...ALL_DAILY_ITEMS, ...ALL_TWICE_ITEMS];
 
+// Auto-populated (cyan) cells: base + fixed offset, driven by daily inputs.
+// These must NEVER be editable; they are derived and displayed read-only.
+const AUTO_POPULATED_GROUPS: {
+  group: string;
+  items: { key: string; label: string; hint: string; compute: (d: Record<string, number>) => number }[];
+}[] = [
+  {
+    group: "Billets (auto-populated)",
+    items: [
+      { key: "E9",  label: "Billet — Ryp_Test (L)", hint: "+ 4,000 off Ryp_Coml (L)",   compute: (d) => (d["C9"] ?? 38511) + 4000 },
+      { key: "F9",  label: "Billet — Ryp_Test (H)", hint: "+ 4,000 off Ryp_Coml (H)",   compute: (d) => (d["D9"] ?? 44511) + 4000 },
+      // Ngp_Test (H) chains: Ryp_Test (L) + 1,500 = (C9 + 4,000) + 1,500
+      { key: "G9",  label: "Billet — Ngp_Test (H)", hint: "+ 5,500 off Ryp_Coml (L) [chain]", compute: (d) => (d["C9"] ?? 38511) + 4000 + 1500 },
+      { key: "I9",  label: "Billet — SAIL_Kol",     hint: "+ 1,000 off SAIL_Dgp",        compute: (d) => (d["H9"] ?? 47000) + 1000 },
+      { key: "J9",  label: "Billet — SAIL_Ryp",     hint: "+ 2,250 off SAIL_Dgp",        compute: (d) => (d["H9"] ?? 47000) + 2250 },
+      { key: "K9",  label: "Billet — SAIL_Ngp",     hint: "+ 2,750 off SAIL_Dgp",        compute: (d) => (d["H9"] ?? 47000) + 2750 },
+      { key: "L9",  label: "Billet — SAIL_Rour",    hint: "+ 1,450 off SAIL_Dgp",        compute: (d) => (d["H9"] ?? 47000) + 1450 },
+    ],
+  },
+  {
+    group: "Wire Rods (auto-populated)",
+    items: [
+      { key: "D18", label: "Wire Rod — RINL/JSW (Pb)",  hint: "+ 5,500 off Ludhiana_Coml", compute: (d) => (d["C18"] ?? 57000) + 5500 },
+      { key: "E18", label: "Wire Rod — RINL/JSW (Lkw)", hint: "+ 4,000 off Ludhiana_Coml", compute: (d) => (d["C18"] ?? 57000) + 4000 },
+    ],
+  },
+];
+
 // Computed categories the engine derives from the Billet/RM cascade. These are
 // the values that feed the cost build-up — shown read-only for verification.
 const COMPUTED_CATEGORIES: { label: string; cat: string }[] = [
@@ -132,6 +160,21 @@ export default function RmPrices() {
       value: pickRMPriceForCategory(computed.rm, c.cat, make, previewMatType),
     }));
   }, [computed, previewMake, previewMatType]);
+
+  // Auto-populated billet & wire-rod cascade — recomputes live from dailyData.
+  const autoPopulatedValues = useMemo(
+    () =>
+      AUTO_POPULATED_GROUPS.map((group) => ({
+        group: group.group,
+        items: group.items.map((item) => ({
+          key: item.key,
+          label: item.label,
+          hint: item.hint,
+          value: item.compute(dailyData),
+        })),
+      })),
+    [dailyData],
+  );
 
   const handleDailyChange = (key: string, value: string) => {
     setDailyData((prev) => ({ ...prev, [key]: Number(value) || 0 }));
@@ -315,6 +358,40 @@ export default function RmPrices() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Auto-Populated Cascade — base + offset cells, read-only */}
+      <Card className="border-border/50">
+        <CardHeader className="pb-4 border-b border-border/50 bg-card/50">
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="text-lg">Auto-Populated Values</CardTitle>
+              <CardDescription className="mt-0.5">
+                Formula-derived from daily inputs. Read-only — these match the cyan cells in the source sheet.
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="text-sky-400 border-sky-400/30 bg-sky-400/10 shrink-0">Auto</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6 space-y-6">
+          {autoPopulatedValues.map((group) => (
+            <div key={group.group} className="space-y-3">
+              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">{group.group}</h3>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {group.items.map((item) => (
+                  <div key={item.key} className="space-y-1">
+                    <div className="text-xs text-muted-foreground truncate" title={item.label}>{item.label}</div>
+                    <div className="text-xs text-sky-400/70 font-mono">{item.hint}</div>
+                    <div className="flex items-center h-9 px-3 rounded-md border border-border/30 bg-sky-400/5 font-mono text-sm font-bold">
+                      <span className="text-muted-foreground mr-1.5">₹</span>
+                      <span>{item.value.toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       {/* Computed RM Prices (read-only auto-populate cascade) */}
       <Card className="border-border/50">
