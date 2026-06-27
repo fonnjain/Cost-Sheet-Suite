@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { useGetRmPrices, useGetRmOffsets, useSaveRmOffsets } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useGetRmPrices, useGetRmOffsets, useSaveRmOffsets, getGetRmPricesQueryKey, getGetRmOffsetsQueryKey } from "@workspace/api-client-react";
 import { computeAutoOverrides, DEFAULT_OFFSETS } from "@/lib/v6/engine";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,8 +79,9 @@ const ALL_KEYS = OFFSET_GROUPS.flatMap((g) => g.items.map((i) => i.key));
 
 export default function RmDataVariation() {
   const { data: rmPrices } = useGetRmPrices();
-  const { data: rmOffsets, refetch } = useGetRmOffsets();
+  const { data: rmOffsets } = useGetRmOffsets();
   const saveRmOffsets = useSaveRmOffsets();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const savedOffsets = useMemo(
@@ -143,7 +145,8 @@ export default function RmDataVariation() {
   const handleSave = async () => {
     try {
       await saveRmOffsets.mutateAsync({ data: { offsetData: localOffsets } });
-      await refetch();
+      await queryClient.invalidateQueries({ queryKey: getGetRmOffsetsQueryKey() });
+      await queryClient.invalidateQueries({ queryKey: getGetRmPricesQueryKey() });
       toast({ title: "Saved", description: "RM offset configuration saved." });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save offsets.";

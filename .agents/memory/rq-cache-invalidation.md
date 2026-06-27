@@ -1,0 +1,16 @@
+---
+name: RQ cache invalidation in cost-sheet
+description: Why cost-sheet mutations must invalidate React Query caches, and how staleTime causes stale UI.
+---
+
+The cost-sheet `QueryClient` (in `artifacts/cost-sheet/src/App.tsx`) sets a 30-second `staleTime`. This means after a mutation, dependent queries keep serving cached data for up to 30s — and pages that mount within that window (or are already mounted) show the OLD state until a manual browser refresh.
+
+**Rule:** every mutation whose result changes data shown elsewhere MUST call `queryClient.invalidateQueries({ queryKey: <generated helper>() })` for each affected query.
+
+**Why:** a real user-reported bug — admin clicked "Unlock Window Today", but the RM Prices twice-monthly panel stayed locked (`isWindowUnlocked` derived from `useGetRmPrices`) until manual refresh. Root cause was the unlock mutation not invalidating the rm-prices cache.
+
+**How to apply:**
+- Use the generated query-key helpers (e.g. `getGetRmPricesQueryKey`, `getGetRmOffsetsQueryKey`) exported from `@workspace/api-client-react` — do not hand-write keys.
+- Unlock window / save RM prices → invalidate `getGetRmPricesQueryKey()`.
+- Save RM offsets → invalidate BOTH `getGetRmOffsetsQueryKey()` and `getGetRmPricesQueryKey()` (offsets feed RM-derived computations on the calculator and RM console).
+- `invalidateQueries` both marks stale and refetches active queries, so a separate `refetch()` on the same key is redundant — pick one.

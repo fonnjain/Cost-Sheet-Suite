@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useListUsers, useUpdateUser, useDeleteUser, useUnlockTwiceMonthly, useGetRmPricesHistory } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useListUsers, useUpdateUser, useDeleteUser, useUnlockTwiceMonthly, useGetRmPricesHistory, getGetRmPricesQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ export default function Admin() {
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
   const unlockWindow = useUnlockTwiceMonthly();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const handleToggleActive = async (id: number, isActive: boolean) => {
@@ -49,6 +51,7 @@ export default function Admin() {
   const handleUnlock = async () => {
     try {
       await unlockWindow.mutateAsync();
+      await queryClient.invalidateQueries({ queryKey: getGetRmPricesQueryKey() });
       toast({ title: "Unlocked", description: "Twice-monthly window unlocked for the rest of the day." });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useGetRmPrices, useSaveRmPrices } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useGetRmPrices, useSaveRmPrices, getGetRmPricesQueryKey } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -101,6 +102,7 @@ export default function RmPrices() {
   const { data: rmPrices, isLoading } = useGetRmPrices();
   const { data: rmOffsets } = useGetRmOffsets();
   const saveRmPrices = useSaveRmPrices();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [, setLocation] = useLocation();
@@ -192,6 +194,7 @@ export default function RmPrices() {
   const handleSaveConfirmed = async () => {
     try {
       await saveRmPrices.mutateAsync({ data: { dailyData, twiceMonthlyData } });
+      await queryClient.invalidateQueries({ queryKey: getGetRmPricesQueryKey() });
       toast({ title: "Saved", description: "RM Prices saved. Opening Calculator…" });
       setShowVerify(false);
       setLocation("/calculator");
