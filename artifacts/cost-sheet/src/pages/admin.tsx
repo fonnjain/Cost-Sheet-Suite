@@ -163,8 +163,8 @@ export default function Admin() {
               </div>
               <CardDescription>
                 {isDailyLocked
-                  ? "RM file inputs are locked for today. They reopen automatically tomorrow."
-                  : "Lock all RM file inputs for today. They reopen automatically tomorrow."}
+                  ? "RM file inputs are locked. They auto-lock daily at 2:00 PM; unlock to reopen them for the rest of today."
+                  : "RM file inputs auto-lock daily at 2:00 PM. You can also lock them now."}
               </CardDescription>
             </CardHeader>
             <CardContent>

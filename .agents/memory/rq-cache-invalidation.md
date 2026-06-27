@@ -29,10 +29,10 @@ The cost-sheet `QueryClient` (in `artifacts/cost-sheet/src/App.tsx`) sets a 30-s
 
 ## Daily RM lock (distinct from twice-monthly window)
 
-A separate admin lock toggles ALL RM file inputs (daily + twice-monthly) + saving off for the current day; auto-reopens next day. Do NOT conflate with the twice-monthly window override — they are independent flags (`isDailyLocked` vs `isWindowOverride`/`isWindowUnlocked`).
+The RM file (daily + twice-monthly inputs AND saving) auto-locks every day at 2:00 PM server-local time; only an admin can reopen it for the rest of that day. The schedule resets daily on its own. Independent of the twice-monthly window override — distinct flags (`isDailyLocked` vs `isWindowOverride`/`isWindowUnlocked`).
 
-**Design:** append-only `rm_daily_locks` table; latest row wins. Lock = insert `lockedDate = today`; unlock = insert `lockedDate = null`. `isDailyLocked = latest && latest.lockedDate === todayKey()`. Auto-reopen is free because yesterday's date != today.
+**Design:** schedule + directional override, mirroring the twice-monthly window pattern. Append-only `rm_daily_locks` table with `lockedDate text` + `locked boolean`; latest row wins. Effective state: if the latest row's `lockedDate === todayKey()` use its `locked` value (admin override for today, either direction); otherwise fall back to the schedule `isAfterAutoLockTime()` (`getHours() >= 14`). Every toggle writes `lockedDate = today` + the chosen `locked`, so an admin unlock counts only for today and the 2 PM auto-lock returns the next day.
 
-**Why date-keyed instead of a boolean:** a stored boolean would not auto-expire; the date comparison gives "opens next day" with no scheduled job.
+**Why override-scoped-to-today:** an unscoped unlock would suppress the next day's auto-lock; tying the override to today's date key makes the schedule self-reset with no cron/scheduled job.
 
-**How to apply:** enforce the lock server-side (403 on `POST /rm-prices`), not just by disabling UI inputs. `todayKey()` uses server LOCAL date components to stay consistent with `isTwiceMonthlyWindow()` (also local `getDate()`).
+**How to apply:** enforce the lock server-side (403 on `POST /rm-prices`), not just by disabling UI inputs. Both `todayKey()` and the 2 PM check use server LOCAL time, consistent with `isTwiceMonthlyWindow()` (local `getDate()`) — if business timezone != server timezone, this is the single place to standardize.

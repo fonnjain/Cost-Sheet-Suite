@@ -209,9 +209,9 @@ via middleware unless noted.
   - `POST /api/rm-prices/toggle-daily-lock` (admin only) — lock/unlock all RM
     file inputs for today. Accepts `{ locked: boolean }` (validated by
     `DailyLockInput`). Appends a row to `rm_daily_locks` with `lockedDate` set to
-    today's key when locking, or `null` when unlocking. The lock auto-clears the
-    next day because `isDailyLocked` only holds when the latest lock row's
-    `lockedDate` equals today.
+    today's key plus the chosen `locked` direction, so an admin override (lock or
+    unlock) only counts for today. See the daily-lock decision below for how this
+    combines with the 2:00 PM auto-lock schedule.
 - `src/routes/rm-offsets.ts`:
   - `GET /api/rm-offsets` — returns the latest `offsetData` object (keyed by
     cell ref, e.g. `{ "E9": 4000, ... }`); returns `{}` when no row exists.
@@ -314,11 +314,14 @@ typecheck:libs` before checking the leaf artifact packages.
 - Twice-monthly RM window: the twice-monthly RM panel (plates, coils) is locked
   unless today is the 1st or 16th of the month, or an admin has explicitly
   unlocked it via the admin panel.
-- Daily RM lock: an admin can lock the entire RM file (daily + twice-monthly
-  inputs and saving) for the current day via the admin panel; it reopens
-  automatically the next day. Independent of the twice-monthly window; enforced
-  both in the UI (disabled inputs/save + banner) and server-side (403 on save).
-  Backed by the append-only `rm_daily_locks` table, read latest-row-wins.
+- Daily RM lock: the entire RM file (daily + twice-monthly inputs and saving)
+  auto-locks every day at 2:00 PM server-local time; only an admin can reopen it
+  for the rest of that day via the admin panel. An admin can also lock early.
+  The schedule resets each day on its own. Independent of the twice-monthly
+  window; enforced both in the UI (disabled inputs/save + banner) and server-side
+  (403 on save). Backed by the append-only `rm_daily_locks` table (`lockedDate` +
+  `locked` direction): an override row dated today wins over the schedule,
+  otherwise the 2:00 PM `isAfterAutoLockTime()` check applies.
 - Quote auto-revisioning: revisions auto-increment per
   `(customerId, projectRef)`; approval is mutually exclusive per project.
 - Client-side calculation with a stable storage shape: the full cost build-up is

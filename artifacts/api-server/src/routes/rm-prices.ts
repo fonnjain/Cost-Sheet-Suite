@@ -32,13 +32,28 @@ function todayKey(): string {
   return `${y}-${m}-${day}`;
 }
 
+// RM prices auto-lock every day at 2:00 PM (server local time). Before then they
+// are open by default; an admin can still lock early or unlock for the rest of
+// the day. The admin override only counts when it was set today, so the 2:00 PM
+// auto-lock resets every day on its own.
+const AUTO_LOCK_HOUR = 14;
+
+function isAfterAutoLockTime(): boolean {
+  return new Date().getHours() >= AUTO_LOCK_HOUR;
+}
+
 async function isDailyLockedToday(): Promise<boolean> {
   const [latest] = await db
     .select()
     .from(rmDailyLocksTable)
     .orderBy(desc(rmDailyLocksTable.createdAt))
     .limit(1);
-  return !!latest && latest.lockedDate === todayKey();
+  // An explicit admin lock/unlock set today wins over the schedule.
+  if (latest && latest.lockedDate === todayKey()) {
+    return latest.locked;
+  }
+  // Otherwise fall back to the daily 2:00 PM auto-lock.
+  return isAfterAutoLockTime();
 }
 
 async function getLatestOffsetData(): Promise<Record<string, number>> {
@@ -154,7 +169,8 @@ router.post("/rm-prices/toggle-daily-lock", requireAuth, requireAdmin, async (re
   }
 
   await db.insert(rmDailyLocksTable).values({
-    lockedDate: parsed.data.locked ? todayKey() : null,
+    lockedDate: todayKey(),
+    locked: parsed.data.locked,
     lockedByName: req.userName ?? "Unknown",
   });
 
