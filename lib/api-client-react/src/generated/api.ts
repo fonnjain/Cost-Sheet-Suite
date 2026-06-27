@@ -41,7 +41,8 @@ import type {
   User,
   UserInput,
   UserQuoteCount,
-  UserUpdate
+  UserUpdate,
+  WindowToggleInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1023,16 +1024,17 @@ export const getUnlockTwiceMonthlyUrl = () => {
 }
 
 /**
- * @summary Admin unlock twice-monthly window
+ * @summary Admin toggle twice-monthly window
  */
-export const unlockTwiceMonthly = async ( options?: RequestInit): Promise<SuccessResponse> => {
+export const unlockTwiceMonthly = async (windowToggleInput?: WindowToggleInput, options?: RequestInit): Promise<SuccessResponse> => {
 
   return customFetch<SuccessResponse>(getUnlockTwiceMonthlyUrl(),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      windowToggleInput,)
   }
 );}
 
@@ -1040,8 +1042,8 @@ export const unlockTwiceMonthly = async ( options?: RequestInit): Promise<Succes
 
 
 export const getUnlockTwiceMonthlyMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unlockTwiceMonthly>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof unlockTwiceMonthly>>, TError,void, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unlockTwiceMonthly>>, TError,{data?: BodyType<WindowToggleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unlockTwiceMonthly>>, TError,{data?: BodyType<WindowToggleInput>}, TContext> => {
 
 const mutationKey = ['unlockTwiceMonthly'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -1053,10 +1055,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unlockTwiceMonthly>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unlockTwiceMonthly>>, {data?: BodyType<WindowToggleInput>}> = (props) => {
+          const {data} = props ?? {};
 
-
-          return  unlockTwiceMonthly(requestOptions)
+          return  unlockTwiceMonthly(data,requestOptions)
         }
 
 
@@ -1067,18 +1069,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type UnlockTwiceMonthlyMutationResult = NonNullable<Awaited<ReturnType<typeof unlockTwiceMonthly>>>
-
+    export type UnlockTwiceMonthlyMutationBody = BodyType<WindowToggleInput> | undefined
     export type UnlockTwiceMonthlyMutationError = ErrorType<unknown>
 
     /**
- * @summary Admin unlock twice-monthly window
+ * @summary Admin toggle twice-monthly window
  */
 export const useUnlockTwiceMonthly = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unlockTwiceMonthly>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unlockTwiceMonthly>>, TError,{data?: BodyType<WindowToggleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof unlockTwiceMonthly>>,
         TError,
-        void,
+        {data?: BodyType<WindowToggleInput>},
         TContext
       > => {
       return useMutation(getUnlockTwiceMonthlyMutationOptions(options));

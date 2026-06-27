@@ -100,7 +100,10 @@ export interface RmPrices {
   twiceMonthlyData: RmPricesTwiceMonthlyData;
   createdAt: string;
   createdByName: string;
+  /** Effective window state — true when today is the 1st/16th OR the admin override is set. */
   isWindowUnlocked: boolean;
+  /** Raw admin override flag on the latest snapshot, independent of the schedule. Drives the admin lock/unlock toggle. */
+  isWindowOverride?: boolean;
 }
 
 export type RmPricesInputDailyData = { [key: string]: unknown };
@@ -126,6 +129,11 @@ export type RmOffsetsInputOffsetData = { [key: string]: unknown };
 
 export interface RmOffsetsInput {
   offsetData: RmOffsetsInputOffsetData;
+}
+
+export interface WindowToggleInput {
+  /** Desired window state. Defaults to true (unlock) for backward compatibility. */
+  unlocked?: boolean;
 }
 
 /**

@@ -252,10 +252,16 @@ paths:
     post:
       operationId: unlockTwiceMonthly
       tags: [rmPrices]
-      summary: Admin unlock twice-monthly window
+      summary: Admin toggle twice-monthly window
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WindowToggleInput"
       responses:
         "200":
-          description: Window unlocked
+          description: Window state updated
           content:
             application/json:
               schema:
@@ -596,6 +602,10 @@ components:
           type: string
         isWindowUnlocked:
           type: boolean
+          description: Effective window state — true when today is the 1st/16th OR the admin override is set.
+        isWindowOverride:
+          type: boolean
+          description: Raw admin override flag on the latest snapshot, independent of the schedule. Drives the admin lock/unlock toggle.
 
     RmPricesInput:
       type: object
@@ -620,6 +630,13 @@ components:
       properties:
         offsetData:
           type: object
+
+    WindowToggleInput:
+      type: object
+      properties:
+        unlocked:
+          type: boolean
+          description: Desired window state. Defaults to true (unlock) for backward compatibility.
 
     Quote:
       type: object

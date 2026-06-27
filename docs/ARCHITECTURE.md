@@ -190,13 +190,19 @@ via middleware unless noted.
   `PATCH/DELETE /api/users/:id`.
 - `src/routes/customers.ts` — `GET/POST /api/customers`.
 - `src/routes/rm-prices.ts`:
-  - `GET /api/rm-prices` — latest RM prices; `isWindowUnlocked` is true when
-    today is the 1st or 16th, or when an admin has explicitly unlocked it.
-    The response also fetches the latest row from `rm_offsets` in parallel
-    and embeds `offsetData` for consumers that need it alongside prices.
+  - `GET /api/rm-prices` — latest RM prices. `isWindowUnlocked` is the
+    effective state (true when today is the 1st or 16th, OR an admin has
+    overridden it); `isWindowOverride` is the raw stored admin flag, exposed
+    separately so the admin toggle reflects the override independently of the
+    schedule. The response also fetches the latest row from `rm_offsets` in
+    parallel and embeds `offsetData` for consumers that need it alongside prices.
   - `POST /api/rm-prices` — save a new RM-price snapshot.
   - `GET /api/rm-prices/history` — last 30 snapshots.
-  - `POST /api/rm-prices/unlock-twice-monthly` (admin only) — unlock the window.
+  - `POST /api/rm-prices/unlock-twice-monthly` (admin only) — toggle the
+    twice-monthly window override. Accepts an optional `{ unlocked: boolean }`
+    body (validated by `WindowToggleInput`); defaults to `true` (unlock) when
+    omitted, for backward compatibility. Sets `isWindowUnlocked` on the latest
+    snapshot, so admins can both open and re-lock the window.
 - `src/routes/rm-offsets.ts`:
   - `GET /api/rm-offsets` — returns the latest `offsetData` object (keyed by
     cell ref, e.g. `{ "E9": 4000, ... }`); returns `{}` when no row exists.

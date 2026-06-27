@@ -149,7 +149,8 @@ export const GetRmPricesResponse = zod.object({
 }).passthrough().describe('JSON blob of twice-monthly input values keyed by cell ref'),
   "createdAt": zod.string(),
   "createdByName": zod.string(),
-  "isWindowUnlocked": zod.boolean()
+  "isWindowUnlocked": zod.boolean().describe('Effective window state — true when today is the 1st\/16th OR the admin override is set.'),
+  "isWindowOverride": zod.boolean().optional().describe('Raw admin override flag on the latest snapshot, independent of the schedule. Drives the admin lock\/unlock toggle.')
 })
 
 
@@ -179,14 +180,19 @@ export const GetRmPricesHistoryResponseItem = zod.object({
 }).passthrough().describe('JSON blob of twice-monthly input values keyed by cell ref'),
   "createdAt": zod.string(),
   "createdByName": zod.string(),
-  "isWindowUnlocked": zod.boolean()
+  "isWindowUnlocked": zod.boolean().describe('Effective window state — true when today is the 1st\/16th OR the admin override is set.'),
+  "isWindowOverride": zod.boolean().optional().describe('Raw admin override flag on the latest snapshot, independent of the schedule. Drives the admin lock\/unlock toggle.')
 })
 export const GetRmPricesHistoryResponse = zod.array(GetRmPricesHistoryResponseItem)
 
 
 /**
- * @summary Admin unlock twice-monthly window
+ * @summary Admin toggle twice-monthly window
  */
+export const UnlockTwiceMonthlyBody = zod.object({
+  "unlocked": zod.boolean().optional().describe('Desired window state. Defaults to true (unlock) for backward compatibility.')
+})
+
 export const UnlockTwiceMonthlyResponse = zod.object({
   "success": zod.boolean(),
   "message": zod.string().nullish()

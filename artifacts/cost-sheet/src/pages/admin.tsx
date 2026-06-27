@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useListUsers, useUpdateUser, useDeleteUser, useUnlockTwiceMonthly, useGetRmPricesHistory, getGetRmPricesQueryKey } from "@workspace/api-client-react";
+import { useListUsers, useUpdateUser, useDeleteUser, useUnlockTwiceMonthly, useGetRmPricesHistory, useGetRmPrices, getGetRmPricesQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -8,17 +8,22 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Unlock, Shield, Trash2, UserCog } from "lucide-react";
+import { Unlock, Lock, Shield, Trash2, UserCog } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Admin() {
   const { data: users, isLoading: loadingUsers } = useListUsers();
   const { data: history, isLoading: loadingHistory } = useGetRmPricesHistory();
+  const { data: rmPrices } = useGetRmPrices();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
   const unlockWindow = useUnlockTwiceMonthly();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const isWindowOpen = !!rmPrices?.isWindowUnlocked;
+  const isOverrideOn = !!rmPrices?.isWindowOverride;
+  const isScheduleOpen = isWindowOpen && !isOverrideOn;
 
   const handleToggleActive = async (id: number, isActive: boolean) => {
     try {
@@ -48,11 +53,17 @@ export default function Admin() {
     }
   };
 
-  const handleUnlock = async () => {
+  const handleToggleWindow = async () => {
+    const nextUnlocked = !isOverrideOn;
     try {
-      await unlockWindow.mutateAsync();
+      await unlockWindow.mutateAsync({ data: { unlocked: nextUnlocked } });
       await queryClient.invalidateQueries({ queryKey: getGetRmPricesQueryKey() });
-      toast({ title: "Unlocked", description: "Twice-monthly window unlocked for the rest of the day." });
+      toast({
+        title: nextUnlocked ? "Unlocked" : "Locked",
+        description: nextUnlocked
+          ? "Twice-monthly window unlocked for the rest of the day."
+          : "Twice-monthly window locked.",
+      });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     }
@@ -125,14 +136,40 @@ export default function Admin() {
           <Card className="border-border/50 border-t-4 border-t-accent">
             <CardHeader>
               <div className="flex items-center gap-2">
-                <Unlock className="h-5 w-5 text-accent" />
+                {isWindowOpen ? (
+                  <Unlock className="h-5 w-5 text-accent" />
+                ) : (
+                  <Lock className="h-5 w-5 text-accent" />
+                )}
                 <CardTitle>Window Override</CardTitle>
               </div>
-              <CardDescription>Manually open the Twice-Monthly RM price window.</CardDescription>
+              <CardDescription>
+                {isScheduleOpen
+                  ? "The window is open by schedule today (1st/16th); no override needed."
+                  : isOverrideOn
+                    ? "The Twice-Monthly RM price window is currently open."
+                    : "Manually open the Twice-Monthly RM price window."}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={handleUnlock} disabled={unlockWindow.isPending} className="w-full font-bold bg-accent hover:bg-accent/90 text-accent-foreground">
-                {unlockWindow.isPending ? "Unlocking..." : "Unlock Window Today"}
+              <Button
+                onClick={handleToggleWindow}
+                disabled={unlockWindow.isPending || isScheduleOpen}
+                className={
+                  isOverrideOn
+                    ? "w-full font-bold bg-muted hover:bg-muted/80 text-foreground border border-border"
+                    : "w-full font-bold bg-accent hover:bg-accent/90 text-accent-foreground"
+                }
+              >
+                {unlockWindow.isPending
+                  ? isOverrideOn
+                    ? "Locking..."
+                    : "Unlocking..."
+                  : isScheduleOpen
+                    ? "Open by Schedule"
+                    : isOverrideOn
+                      ? "Lock Window"
+                      : "Unlock Window Today"}
               </Button>
             </CardContent>
           </Card>

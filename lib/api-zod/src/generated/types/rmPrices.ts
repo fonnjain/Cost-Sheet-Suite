@@ -16,5 +16,8 @@ export interface RmPrices {
   twiceMonthlyData: RmPricesTwiceMonthlyData;
   createdAt: string;
   createdByName: string;
+  /** Effective window state — true when today is the 1st/16th OR the admin override is set. */
   isWindowUnlocked: boolean;
+  /** Raw admin override flag on the latest snapshot, independent of the schedule. Drives the admin lock/unlock toggle. */
+  isWindowOverride?: boolean;
 }

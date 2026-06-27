@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { rmPricesTable, rmOffsetsTable } from "@workspace/db/schema";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
-import { SaveRmPricesBody } from "@workspace/api-zod";
+import { SaveRmPricesBody, UnlockTwiceMonthlyBody } from "@workspace/api-zod";
 
 const router = Router();
 
@@ -14,6 +14,7 @@ function formatRmPrice(r: typeof rmPricesTable.$inferSelect) {
     twiceMonthlyData: r.twiceMonthlyData,
     createdByName: r.createdByName,
     isWindowUnlocked: r.isWindowUnlocked,
+    isWindowOverride: r.isWindowUnlocked,
     createdAt: r.createdAt?.toISOString(),
   };
 }
@@ -46,6 +47,7 @@ router.get("/rm-prices", requireAuth, async (_req, res): Promise<void> => {
       offsetData,
       createdByName: "System",
       isWindowUnlocked: isTwiceMonthlyWindow(),
+      isWindowOverride: false,
       createdAt: new Date().toISOString(),
     });
     return;
@@ -55,6 +57,7 @@ router.get("/rm-prices", requireAuth, async (_req, res): Promise<void> => {
     ...formatRmPrice(latest),
     offsetData,
     isWindowUnlocked: isTwiceMonthlyWindow() || latest.isWindowUnlocked,
+    isWindowOverride: latest.isWindowUnlocked,
   });
 });
 
@@ -90,7 +93,14 @@ router.get("/rm-prices/history", requireAuth, async (_req, res): Promise<void> =
   res.json(history.map(formatRmPrice));
 });
 
-router.post("/rm-prices/unlock-twice-monthly", requireAuth, requireAdmin, async (_req, res): Promise<void> => {
+router.post("/rm-prices/unlock-twice-monthly", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  const parsed = UnlockTwiceMonthlyBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid request body" });
+    return;
+  }
+  const unlocked = parsed.data.unlocked ?? true;
+
   const [latest] = await db
     .select()
     .from(rmPricesTable)
@@ -100,11 +110,14 @@ router.post("/rm-prices/unlock-twice-monthly", requireAuth, requireAdmin, async 
   if (latest) {
     await db
       .update(rmPricesTable)
-      .set({ isWindowUnlocked: true })
+      .set({ isWindowUnlocked: unlocked })
       .where(eq(rmPricesTable.id, latest.id));
   }
 
-  res.json({ success: true, message: "Twice-monthly window unlocked" });
+  res.json({
+    success: true,
+    message: unlocked ? "Twice-monthly window unlocked" : "Twice-monthly window locked",
+  });
 });
 
 export default router;

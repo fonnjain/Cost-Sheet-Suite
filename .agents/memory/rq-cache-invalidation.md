@@ -14,3 +14,15 @@ The cost-sheet `QueryClient` (in `artifacts/cost-sheet/src/App.tsx`) sets a 30-s
 - Unlock window / save RM prices → invalidate `getGetRmPricesQueryKey()`.
 - Save RM offsets → invalidate BOTH `getGetRmOffsetsQueryKey()` and `getGetRmPricesQueryKey()` (offsets feed RM-derived computations on the calculator and RM console).
 - `invalidateQueries` both marks stale and refetches active queries, so a separate `refetch()` on the same key is redundant — pick one.
+
+## RM window: effective vs override state
+
+`GET /api/rm-prices` returns two distinct booleans:
+- `isWindowUnlocked` — EFFECTIVE state: `isTwiceMonthlyWindow() (1st/16th) || stored override`.
+- `isWindowOverride` — the RAW stored admin override flag, independent of the schedule.
+
+**Rule:** the admin lock/unlock toggle MUST be driven by `isWindowOverride`, not `isWindowUnlocked`. Using the effective flag makes the button stick on "Lock Window" on the 1st/16th (schedule forces it open, so locking the override has no visible effect).
+
+**Why:** real bug — on schedule days the toggle appeared broken because the effective flag was always true.
+
+**How to apply:** schedule-open (`isWindowUnlocked && !isWindowOverride`) → disable the toggle, show "Open by Schedule". The toggle endpoint `POST /api/rm-prices/unlock-twice-monthly` takes an optional `{ unlocked: boolean }` body (defaults to true for backward compat) and sets the override on the latest snapshot.

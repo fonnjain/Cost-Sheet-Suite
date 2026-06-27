@@ -41,3 +41,4 @@ export * from './userQuoteCount';
 export * from './userRole';
 export * from './userUpdate';
 export * from './userUpdateRole';
+export * from './windowToggleInput';
