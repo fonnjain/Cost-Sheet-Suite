@@ -194,6 +194,26 @@ export const UnlockTwiceMonthlyResponse = zod.object({
 
 
 /**
+ * @summary Get current RM offset configuration
+ */
+export const GetRmOffsetsResponse = zod.object({
+  "offsetData": zod.object({
+
+}).passthrough().describe('JSON blob of editable offsets keyed by cell ref (E9, F9, G9, I9, J9, K9, L9, D18, E18)')
+})
+
+
+/**
+ * @summary Save RM offset configuration
+ */
+export const SaveRmOffsetsBody = zod.object({
+  "offsetData": zod.object({
+
+}).passthrough()
+})
+
+
+/**
  * @summary List all quotes with optional filters
  */
 export const ListQuotesQueryParams = zod.object({

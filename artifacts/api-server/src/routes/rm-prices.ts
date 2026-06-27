@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { rmPricesTable } from "@workspace/db/schema";
+import { rmPricesTable, rmOffsetsTable } from "@workspace/db/schema";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { SaveRmPricesBody } from "@workspace/api-zod";
 
@@ -23,18 +23,27 @@ function isTwiceMonthlyWindow(): boolean {
   return day === 1 || day === 16;
 }
 
-router.get("/rm-prices", requireAuth, async (_req, res): Promise<void> => {
+async function getLatestOffsetData(): Promise<Record<string, number>> {
   const [latest] = await db
     .select()
-    .from(rmPricesTable)
-    .orderBy(desc(rmPricesTable.createdAt))
+    .from(rmOffsetsTable)
+    .orderBy(desc(rmOffsetsTable.updatedAt))
     .limit(1);
+  return (latest?.offsetData as Record<string, number>) ?? {};
+}
+
+router.get("/rm-prices", requireAuth, async (_req, res): Promise<void> => {
+  const [[latest], offsetData] = await Promise.all([
+    db.select().from(rmPricesTable).orderBy(desc(rmPricesTable.createdAt)).limit(1),
+    getLatestOffsetData(),
+  ]);
 
   if (!latest) {
     res.json({
       id: 0,
       dailyData: {},
       twiceMonthlyData: {},
+      offsetData,
       createdByName: "System",
       isWindowUnlocked: isTwiceMonthlyWindow(),
       createdAt: new Date().toISOString(),
@@ -44,6 +53,7 @@ router.get("/rm-prices", requireAuth, async (_req, res): Promise<void> => {
 
   res.json({
     ...formatRmPrice(latest),
+    offsetData,
     isWindowUnlocked: isTwiceMonthlyWindow() || latest.isWindowUnlocked,
   });
 });

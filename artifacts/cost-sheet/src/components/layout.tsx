@@ -68,6 +68,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const NavLinks = () => (
     <>
       <NavLink href="/rm-prices" testId="nav-rm-prices">RM Prices</NavLink>
+      <NavLink href="/rm-data-variation" testId="nav-rm-data-variation">RM Variation</NavLink>
       <NavLink href="/calculator" testId="nav-calculator">Calculator</NavLink>
       <NavLink href="/dashboard" testId="nav-dashboard">Dashboard</NavLink>
       <NavLink href="/review" testId="nav-review">Review</NavLink>

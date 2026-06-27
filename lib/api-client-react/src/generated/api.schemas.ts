@@ -113,6 +113,22 @@ export interface RmPricesInput {
 }
 
 /**
+ * JSON blob of editable offsets keyed by cell ref (E9, F9, G9, I9, J9, K9, L9, D18, E18)
+ */
+export type RmOffsetsOffsetData = { [key: string]: unknown };
+
+export interface RmOffsets {
+  /** JSON blob of editable offsets keyed by cell ref (E9, F9, G9, I9, J9, K9, L9, D18, E18) */
+  offsetData: RmOffsetsOffsetData;
+}
+
+export type RmOffsetsInputOffsetData = { [key: string]: unknown };
+
+export interface RmOffsetsInput {
+  offsetData: RmOffsetsInputOffsetData;
+}
+
+/**
  * Full JSON of all cost inputs
  */
 export type QuoteInputs = { [key: string]: unknown };

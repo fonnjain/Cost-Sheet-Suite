@@ -4,6 +4,7 @@ import authRouter from "./auth";
 import usersRouter from "./users";
 import customersRouter from "./customers";
 import rmPricesRouter from "./rm-prices";
+import rmOffsetsRouter from "./rm-offsets";
 import quotesRouter from "./quotes";
 import dashboardRouter from "./dashboard";
 
@@ -14,6 +15,7 @@ router.use(authRouter);
 router.use(usersRouter);
 router.use(customersRouter);
 router.use(rmPricesRouter);
+router.use(rmOffsetsRouter);
 router.use(quotesRouter);
 router.use(dashboardRouter);
 

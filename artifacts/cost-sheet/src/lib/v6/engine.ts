@@ -180,6 +180,48 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Default additive offsets for the 9 auto-populated billet/wire-rod cells. */
+export const DEFAULT_OFFSETS: Record<string, number> = {
+  E9: 4000,
+  F9: 4000,
+  G9: 1500,
+  I9: 1000,
+  J9: 2250,
+  K9: 2750,
+  L9: 1450,
+  D18: 5500,
+  E18: 4000,
+};
+
+/**
+ * Compute the 9 auto-populated cell values from live daily inputs and the
+ * configurable offsets (merged on top of DEFAULT_OFFSETS).
+ *
+ * Chain: G9 = E9 + o.G9 (E9 is computed first, G9 chains off it)
+ */
+export function computeAutoOverrides(
+  daily: Record<string, number>,
+  offsets: Record<string, number> = {},
+): Record<string, number> {
+  const o: Record<string, number> = { ...DEFAULT_OFFSETS, ...offsets };
+  const c9 = daily["C9"] ?? 38511;
+  const d9 = daily["D9"] ?? 44511;
+  const h9 = daily["H9"] ?? 47000;
+  const c18 = daily["C18"] ?? 57000;
+  const E9 = c9 + o["E9"];
+  return {
+    E9,
+    F9: d9 + o["F9"],
+    G9: E9 + o["G9"],
+    I9: h9 + o["I9"],
+    J9: h9 + o["J9"],
+    K9: h9 + o["K9"],
+    L9: h9 + o["L9"],
+    D18: c18 + o["D18"],
+    E18: c18 + o["E18"],
+  };
+}
+
 export function buildRMData(overrides: Overrides = {}): RMData {
   const { cellNum, cellStr } = makeEvaluator(overrides);
 

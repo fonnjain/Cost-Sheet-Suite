@@ -32,6 +32,8 @@ import type {
   LoginInput,
   Quote,
   QuoteInput,
+  RmOffsets,
+  RmOffsetsInput,
   RmPrices,
   RmPricesInput,
   StructureCount,
@@ -1080,6 +1082,154 @@ export const useUnlockTwiceMonthly = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUnlockTwiceMonthlyMutationOptions(options));
+    }
+
+export const getGetRmOffsetsUrl = () => {
+
+
+
+
+  return `/api/rm-offsets`
+}
+
+/**
+ * @summary Get current RM offset configuration
+ */
+export const getRmOffsets = async ( options?: RequestInit): Promise<RmOffsets> => {
+
+  return customFetch<RmOffsets>(getGetRmOffsetsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRmOffsetsQueryKey = () => {
+    return [
+    `/api/rm-offsets`
+    ] as const;
+    }
+
+
+export const getGetRmOffsetsQueryOptions = <TData = Awaited<ReturnType<typeof getRmOffsets>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRmOffsets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRmOffsetsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRmOffsets>>> = ({ signal }) => getRmOffsets({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRmOffsets>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRmOffsetsQueryResult = NonNullable<Awaited<ReturnType<typeof getRmOffsets>>>
+export type GetRmOffsetsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get current RM offset configuration
+ */
+
+export function useGetRmOffsets<TData = Awaited<ReturnType<typeof getRmOffsets>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRmOffsets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRmOffsetsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSaveRmOffsetsUrl = () => {
+
+
+
+
+  return `/api/rm-offsets`
+}
+
+/**
+ * @summary Save RM offset configuration
+ */
+export const saveRmOffsets = async (rmOffsetsInput: RmOffsetsInput, options?: RequestInit): Promise<RmOffsets> => {
+
+  return customFetch<RmOffsets>(getSaveRmOffsetsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      rmOffsetsInput,)
+  }
+);}
+
+
+
+
+export const getSaveRmOffsetsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveRmOffsets>>, TError,{data: BodyType<RmOffsetsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveRmOffsets>>, TError,{data: BodyType<RmOffsetsInput>}, TContext> => {
+
+const mutationKey = ['saveRmOffsets'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveRmOffsets>>, {data: BodyType<RmOffsetsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveRmOffsets(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveRmOffsetsMutationResult = NonNullable<Awaited<ReturnType<typeof saveRmOffsets>>>
+    export type SaveRmOffsetsMutationBody = BodyType<RmOffsetsInput>
+    export type SaveRmOffsetsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Save RM offset configuration
+ */
+export const useSaveRmOffsets = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveRmOffsets>>, TError,{data: BodyType<RmOffsetsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveRmOffsets>>,
+        TError,
+        {data: BodyType<RmOffsetsInput>},
+        TContext
+      > => {
+      return useMutation(getSaveRmOffsetsMutationOptions(options));
     }
 
 export const getListQuotesUrl = (params?: ListQuotesParams,) => {

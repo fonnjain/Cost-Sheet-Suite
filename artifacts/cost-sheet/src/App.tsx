@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import Login from "./pages/login";
 import Home from "./pages/home";
 import RmPrices from "./pages/rm-prices";
+import RmDataVariation from "./pages/rm-data-variation";
 import Calculator from "./pages/calculator";
 import Dashboard from "./pages/dashboard";
 import Review from "./pages/review";
@@ -49,6 +50,11 @@ function Router() {
         <Route path="/rm-prices">
           <Layout>
             <RmPrices />
+          </Layout>
+        </Route>
+        <Route path="/rm-data-variation">
+          <Layout>
+            <RmDataVariation />
           </Layout>
         </Route>
         <Route path="/calculator">

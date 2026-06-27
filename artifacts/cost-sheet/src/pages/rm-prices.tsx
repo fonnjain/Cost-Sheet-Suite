@@ -14,7 +14,8 @@ import { format } from "date-fns";
 import { Upload, Save, CheckCircle, AlertTriangle, Calculator as CalcIcon } from "lucide-react";
 import { INITIAL_DATA } from "@/lib/v6/data";
 import type { InitialCell } from "@/lib/v6/data";
-import { buildRMData, getDistinctMakes, pickRMPriceForCategory } from "@/lib/v6/engine";
+import { buildRMData, computeAutoOverrides, DEFAULT_OFFSETS, getDistinctMakes, pickRMPriceForCategory } from "@/lib/v6/engine";
+import { useGetRmOffsets } from "@workspace/api-client-react";
 
 interface RmGroup {
   name: string;
@@ -98,6 +99,7 @@ function parseImportedCsv(text: string): Record<string, number> | null {
 
 export default function RmPrices() {
   const { data: rmPrices, isLoading } = useGetRmPrices();
+  const { data: rmOffsets } = useGetRmOffsets();
   const saveRmPrices = useSaveRmPrices();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -141,11 +143,13 @@ export default function RmPrices() {
   // Build computed RM data reactively from the current inputs (overrides applied
   // to the embedded Billet/RM cells). This is the v6 auto-populate cascade.
   const computed = useMemo(() => {
-    const overrides = { ...dailyData, ...twiceMonthlyData };
+    const offsets = (rmOffsets?.offsetData as Record<string, number>) ?? {};
+    const autoOverrides = computeAutoOverrides(dailyData, offsets);
+    const overrides = { ...dailyData, ...twiceMonthlyData, ...autoOverrides };
     const rm = buildRMData(overrides);
     const makes = getDistinctMakes(rm);
     return { rm, makes };
-  }, [dailyData, twiceMonthlyData]);
+  }, [dailyData, twiceMonthlyData, rmOffsets?.offsetData]);
 
   useEffect(() => {
     if (computed.makes.length > 0 && !computed.makes.includes(previewMake)) {
@@ -161,20 +165,21 @@ export default function RmPrices() {
     }));
   }, [computed, previewMake, previewMatType]);
 
-  // Auto-populated billet & wire-rod cascade — recomputes live from dailyData.
-  const autoPopulatedValues = useMemo(
-    () =>
-      AUTO_POPULATED_GROUPS.map((group) => ({
-        group: group.group,
-        items: group.items.map((item) => ({
-          key: item.key,
-          label: item.label,
-          hint: item.hint,
-          value: item.compute(dailyData),
-        })),
+  // Auto-populated billet & wire-rod cascade — recomputes live from dailyData
+  // using DB-persisted offsets (falls back to DEFAULT_OFFSETS when not set).
+  const autoPopulatedValues = useMemo(() => {
+    const offsets = (rmOffsets?.offsetData as Record<string, number>) ?? {};
+    const autoOverrides = computeAutoOverrides(dailyData, offsets);
+    return AUTO_POPULATED_GROUPS.map((group) => ({
+      group: group.group,
+      items: group.items.map((item) => ({
+        key: item.key,
+        label: item.label,
+        hint: `+\u2009${(offsets[item.key] ?? DEFAULT_OFFSETS[item.key] ?? 0).toLocaleString("en-IN")} offset`,
+        value: autoOverrides[item.key] ?? 0,
       })),
-    [dailyData],
-  );
+    }));
+  }, [dailyData, rmOffsets?.offsetData]);
 
   const handleDailyChange = (key: string, value: string) => {
     setDailyData((prev) => ({ ...prev, [key]: Number(value) || 0 }));

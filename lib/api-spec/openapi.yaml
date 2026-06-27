@@ -17,6 +17,8 @@ tags:
     description: Customer management
   - name: rmPrices
     description: Raw material prices
+  - name: rmOffsets
+    description: RM price offset configuration
   - name: quotes
     description: Quote management
   - name: dashboard
@@ -258,6 +260,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
+
+  /rm-offsets:
+    get:
+      operationId: getRmOffsets
+      tags: [rmOffsets]
+      summary: Get current RM offset configuration
+      responses:
+        "200":
+          description: Current offsets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RmOffsets"
+    post:
+      operationId: saveRmOffsets
+      tags: [rmOffsets]
+      summary: Save RM offset configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RmOffsetsInput"
+      responses:
+        "201":
+          description: Offsets saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RmOffsets"
 
   /quotes:
     get:
@@ -572,6 +604,21 @@ components:
         dailyData:
           type: object
         twiceMonthlyData:
+          type: object
+
+    RmOffsets:
+      type: object
+      required: [offsetData]
+      properties:
+        offsetData:
+          type: object
+          description: JSON blob of editable offsets keyed by cell ref (E9, F9, G9, I9, J9, K9, L9, D18, E18)
+
+    RmOffsetsInput:
+      type: object
+      required: [offsetData]
+      properties:
+        offsetData:
           type: object
 
     Quote:

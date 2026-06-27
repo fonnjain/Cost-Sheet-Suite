@@ -22,7 +22,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
 import { formatINR } from "@/lib/costCalculator";
-import { buildRMData, calculateCostSheet, buildDefaultInputs, getDistinctMakes, MASTER_SPECS } from "@/lib/v6/engine";
+import { buildRMData, calculateCostSheet, buildDefaultInputs, computeAutoOverrides, getDistinctMakes, MASTER_SPECS } from "@/lib/v6/engine";
+import { useGetRmOffsets } from "@workspace/api-client-react";
 import { toLegacyShape } from "@/lib/v6/legacy";
 import { ChevronRight, ChevronLeft, Check, Plus, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -113,6 +114,7 @@ export default function Calculator() {
   const createCustomer = useCreateCustomer();
   const createQuote = useCreateQuote();
   const { data: rmPrices } = useGetRmPrices();
+  const { data: rmOffsets } = useGetRmOffsets();
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState(1);
@@ -143,14 +145,15 @@ export default function Calculator() {
   const [kvOption, setKvOption] = useState("");
 
   // RM data derived from the saved console values, evaluated through the v6 engine.
-  const rm = useMemo(
-    () =>
-      buildRMData({
-        ...((rmPrices?.dailyData as Record<string, number>) ?? {}),
-        ...((rmPrices?.twiceMonthlyData as Record<string, number>) ?? {}),
-      }),
-    [rmPrices]
-  );
+  // Auto-populated cells (E9, F9, G9, I9, J9, K9, L9, D18, E18) are computed
+  // from dailyData + DB-persisted offsets (falls back to DEFAULT_OFFSETS).
+  const rm = useMemo(() => {
+    const daily = (rmPrices?.dailyData as Record<string, number>) ?? {};
+    const twice = (rmPrices?.twiceMonthlyData as Record<string, number>) ?? {};
+    const offsets = (rmOffsets?.offsetData as Record<string, number>) ?? {};
+    const autoOverrides = computeAutoOverrides(daily, offsets);
+    return buildRMData({ ...daily, ...twice, ...autoOverrides });
+  }, [rmPrices, rmOffsets?.offsetData]);
   const spec = structureType ? (MASTER_SPECS as Record<string, any>)[structureType] : null;
   const schema = spec?.schema as string | undefined;
   const isKvSchema = schema === "tlt5" || schema === "subp" || schema === "rsj";
