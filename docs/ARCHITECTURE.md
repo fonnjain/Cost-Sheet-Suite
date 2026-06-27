@@ -97,6 +97,10 @@ Routing uses wouter, mounted under the Vite base path
 - `/` — `src/pages/home.tsx`: landing / step navigation.
 - `/rm-prices` — `src/pages/rm-prices.tsx`: RM prices console (daily and
   twice-monthly panels, window lock, admin unlock).
+- `/rm-data-variation` — `src/pages/rm-data-variation.tsx`: editable offset
+  configuration for the 9 auto-populated billet and wire-rod cells (E9, F9,
+  G9, I9, J9, K9, L9, D18, E18). Shows BASE | OFFSET (editable) | RESULT
+  per cell; persists offsets to the `rm_offsets` table via `POST /api/rm-offsets`.
 - `/calculator` — `src/pages/calculator.tsx`: project info, structure picker,
   full cost build-up, save quote.
 - `/dashboard` — `src/pages/dashboard.tsx`: KPIs and charts.
@@ -140,7 +144,11 @@ relevant modules:
     cell and cross-sheet references, and overrides applied to Billet-sheet
     cells) plus the RM-data parsing and the cost-sheet math: `buildRMData`,
     `pickRMPriceForCategory`, `calculateRMPrice`, `calculateCostSheet`, and
-    `buildDefaultInputs`. It reproduces the v6 numbers to the rupee.
+    `buildDefaultInputs`. It reproduces the v6 numbers to the rupee. Also
+    exports `DEFAULT_OFFSETS` (the 9 default additive constants) and
+    `computeAutoOverrides(daily, offsets)`, which merges DB-persisted offsets
+    on top of the defaults and returns the computed cell values; G9 chains off
+    the already-computed E9 rather than off the raw base.
   - `legacy.ts` — `toLegacyShape` maps the v6 engine's `CostResults` and
     v6-keyed inputs into the flat, camelCase storage shape (`legacyInputs` +
     `legacyCostBreakdown`) that the dashboard, review, and PDF-export pages read.
@@ -184,9 +192,17 @@ via middleware unless noted.
 - `src/routes/rm-prices.ts`:
   - `GET /api/rm-prices` — latest RM prices; `isWindowUnlocked` is true when
     today is the 1st or 16th, or when an admin has explicitly unlocked it.
+    The response also fetches the latest row from `rm_offsets` in parallel
+    and embeds `offsetData` for consumers that need it alongside prices.
   - `POST /api/rm-prices` — save a new RM-price snapshot.
   - `GET /api/rm-prices/history` — last 30 snapshots.
   - `POST /api/rm-prices/unlock-twice-monthly` (admin only) — unlock the window.
+- `src/routes/rm-offsets.ts`:
+  - `GET /api/rm-offsets` — returns the latest `offsetData` object (keyed by
+    cell ref, e.g. `{ "E9": 4000, ... }`); returns `{}` when no row exists.
+  - `POST /api/rm-offsets` — inserts a new offset snapshot, validated with
+    the generated `SaveRmOffsetsBody` Zod schema. Each save is appended; the
+    GET always reads the most-recent row (append-only audit trail).
 - `src/routes/quotes.ts`:
   - `GET /api/quotes` — list with optional `customerId` / `projectRef` filters.
   - `POST /api/quotes` — create; auto-assigns the next revision (see below).
@@ -221,6 +237,12 @@ The Drizzle client is created in `lib/db/src/index.ts` from a `pg` pool using
 - `rm_prices` (`schema/rm_prices.ts`): `id` (serial PK), `dailyData` (jsonb),
   `twiceMonthlyData` (jsonb), `createdByName`, `isWindowUnlocked` (default
   false), `createdAt`. Each row is a point-in-time RM-price snapshot.
+- `rm_offsets` (`schema/rm_offsets.ts`): `id` (serial PK), `offsetData`
+  (jsonb — a `Record<string, number>` keyed by cell ref such as `E9`),
+  `updatedByName`, `updatedAt`. Append-only; the GET endpoint reads the
+  most-recent row. Stores the 9 additive offset constants that control the
+  auto-populated billet and wire-rod cells; defaults fall back to
+  `DEFAULT_OFFSETS` in `engine.ts` when no row exists.
 - `quotes` (`schema/quotes.ts`): `id` (serial PK), `customerId`, `customerName`
   (denormalized for query performance), `projectRef`, `revision` (default 0),
   `structureType`, `kvOption`, `quotePricePerMt`, `totalCost`, `steelPrice`,
@@ -283,6 +305,12 @@ typecheck:libs` before checking the leaf artifact packages.
   computed in the browser by the v6 engine, then mapped via `toLegacyShape`
   into a flat shape before storage so display code stays stable. Only the final
   result and inputs are persisted.
+- DB-persisted RM offsets: the 9 additive constants that derive auto-populated
+  billet/wire-rod cell values (E9, F9, G9, I9, J9, K9, L9, D18, E18) from the
+  daily input prices are stored in `rm_offsets` and editable via the RM Data
+  Variation page. `computeAutoOverrides` in `engine.ts` merges these on top of
+  `DEFAULT_OFFSETS`. Both the RM console and the Calculator fetch the latest
+  offsets via `useGetRmOffsets` and apply them when building RM data.
 - Legacy quote flagging: older quotes are flagged and rendered read-only with a
   note, keeping revision history intact while new quotes use the corrected
   engine.
