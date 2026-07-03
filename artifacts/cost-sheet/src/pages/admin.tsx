@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Unlock, Lock, Shield, Trash2, UserCog } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RmRatioEditor } from "@/components/rm-ratio-editor";
 
 export default function Admin() {
   const { data: users, isLoading: loadingUsers } = useListUsers();
@@ -250,8 +249,6 @@ export default function Admin() {
           </Card>
         </div>
       </div>
-
-      <RmRatioEditor />
 
       <Card className="border-border/50">
         <CardHeader className="bg-card/50 border-b border-border/50">

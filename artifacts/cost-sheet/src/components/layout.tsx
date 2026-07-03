@@ -70,6 +70,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <NavLink href="/rm-prices" testId="nav-rm-prices">RM Prices</NavLink>
       <NavLink href="/rm-price-list" testId="nav-rm-price-list">RM Price List</NavLink>
       <NavLink href="/rm-data-variation" testId="nav-rm-data-variation">RM Variation</NavLink>
+      {user.role === "admin" && (
+        <NavLink href="/rm-ratios" testId="nav-rm-ratios">RM Ratios</NavLink>
+      )}
       <NavLink href="/calculator" testId="nav-calculator">Calculator</NavLink>
       <NavLink href="/dashboard" testId="nav-dashboard">Dashboard</NavLink>
       <NavLink href="/review" testId="nav-review">Review</NavLink>

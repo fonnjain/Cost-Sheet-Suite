@@ -10,6 +10,7 @@ import Home from "./pages/home";
 import RmPrices from "./pages/rm-prices";
 import RmPriceList from "./pages/rm-price-list";
 import RmDataVariation from "./pages/rm-data-variation";
+import RmRatios from "./pages/rm-ratios";
 import Calculator from "./pages/calculator";
 import Dashboard from "./pages/dashboard";
 import Review from "./pages/review";
@@ -61,6 +62,11 @@ function Router() {
         <Route path="/rm-data-variation">
           <Layout>
             <RmDataVariation />
+          </Layout>
+        </Route>
+        <Route path="/rm-ratios">
+          <Layout>
+            <RmRatios />
           </Layout>
         </Route>
         <Route path="/calculator">
