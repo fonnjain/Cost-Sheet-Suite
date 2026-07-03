@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { MASTER_SPECS } from "@/lib/v6/engine";
 import { format } from "date-fns";
 import { AlertTriangle, Scale, History } from "lucide-react";
 
@@ -58,7 +59,7 @@ interface RatioRow {
   updatedAt: string;
 }
 
-function KvRowEditor({ structureName, kv, categories, rows }: { structureName: string; kv: string; categories: string[]; rows: RatioRow[] }) {
+function KvRowEditor({ structureName, kv, categories, initialValues }: { structureName: string; kv: string; categories: string[]; initialValues: Record<string, number> }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const saveRatios = useSaveRmRatios();
@@ -66,11 +67,11 @@ function KvRowEditor({ structureName, kv, categories, rows }: { structureName: s
   const initial = useMemo(() => {
     const map: Record<string, string> = {};
     for (const cat of categories) {
-      const row = rows.find((r) => r.category === cat);
-      map[cat] = row ? (row.ratioValue * 100).toFixed(2) : "0";
+      const v = initialValues[cat];
+      map[cat] = v !== undefined ? (v * 100).toFixed(2) : "0";
     }
     return map;
-  }, [categories, rows]);
+  }, [categories, initialValues]);
 
   const [values, setValues] = useState<Record<string, string>>(initial);
   const [dirty, setDirty] = useState(false);
@@ -157,18 +158,27 @@ export function RmRatioEditor() {
     [ratios, selectedStructure],
   );
 
+  // The canonical grid (which kv rows and categories exist, and their default
+  // values) comes from MASTER_SPECS -- the same source the calculator falls
+  // back to. Any DB-saved override is overlaid on top. This means the editor
+  // always shows the ratios even when the rm_ratios table hasn't been seeded
+  // (e.g. a fresh production database); the first admin save then persists them.
   const kvGroups = useMemo(() => {
-    const byKv = new Map<string, RatioRow[]>();
-    for (const row of rowsForStructure) {
-      if (!byKv.has(row.kv)) byKv.set(row.kv, []);
-      byKv.get(row.kv)!.push(row);
-    }
-    return Array.from(byKv.entries()).map(([kv, rows]) => ({
-      kv,
-      rows,
-      categories: sortCategories(rows.map((r) => r.category)),
-    }));
-  }, [rowsForStructure]);
+    const spec = (MASTER_SPECS as Record<string, any>)[selectedStructure];
+    const kvOptions = (spec?.ratios?.kv_options ?? []) as { kv: string; ratios: Record<string, number> }[];
+    const overrideByKvCat = new Map<string, number>();
+    for (const r of rowsForStructure) overrideByKvCat.set(`${r.kv}\u0000${r.category}`, r.ratioValue);
+
+    return kvOptions.map((opt) => {
+      const categories = sortCategories(Object.keys(opt.ratios));
+      const values: Record<string, number> = {};
+      for (const cat of categories) {
+        const override = overrideByKvCat.get(`${opt.kv}\u0000${cat}`);
+        values[cat] = override !== undefined ? override : opt.ratios[cat];
+      }
+      return { kv: opt.kv, categories, values };
+    });
+  }, [selectedStructure, rowsForStructure]);
 
   return (
     <>
@@ -209,7 +219,7 @@ export function RmRatioEditor() {
                   structureName={selectedStructure}
                   kv={group.kv}
                   categories={group.categories}
-                  rows={group.rows}
+                  initialValues={group.values}
                 />
               ))}
             </div>
