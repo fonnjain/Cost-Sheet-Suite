@@ -267,6 +267,90 @@ export function buildRMData(overrides: Overrides = {}): RMData {
   return { angles, flats, rounds, rsj, plate, pipe, hardware, fbolts, zincPrice, rmDate };
 }
 
+// ---------- Read-only "RM Price List" tab (second worksheet, verbatim) ----------
+// Purely additive: reuses the same evaluator/overrides as buildRMData above but
+// also surfaces the Base Price / Load+Transport+Brokerage header rows that the
+// cost-build-up path never needed. Does not affect buildRMData or any
+// calculation — it's a separate read path for display only.
+export interface RMPriceListHeader {
+  col: string;
+  make: string;
+  supplier: string;
+  basePrice: number | null;
+  transportLabel: string;
+  transport: number | null;
+}
+export interface RMPriceListBlock {
+  key: string;
+  title: string;
+  headers: RMPriceListHeader[];
+  rows: RMRow[];
+}
+export interface RMPriceListView {
+  blocks: RMPriceListBlock[];
+  zincPrice: number | null;
+  rmDate: string;
+}
+
+export function buildRMPriceListView(overrides: Overrides = {}): RMPriceListView {
+  const { cellNum, cellStr } = makeEvaluator(overrides);
+
+  function readDisplayBlock(
+    key: string,
+    title: string,
+    makeRow: number,
+    supplierRow: number,
+    range: [number, number],
+    cols: string[],
+  ): RMPriceListBlock {
+    const basePriceRow = makeRow - 2;
+    const transportRow = makeRow - 1;
+    const transportLabel = (cellStr(RM_SHEET, `C${transportRow}`) || "Load+Transport+Brokerage").replace(/:$/, "");
+    const headers: RMPriceListHeader[] = [];
+    for (const col of cols) {
+      const makeTag = cellStr(RM_SHEET, `${col}${makeRow}`);
+      if (!makeTag) continue;
+      const make = makeTag.replace(/^\(|\)$/g, "").trim();
+      const supplier = (cellStr(RM_SHEET, `${col}${supplierRow}`) || "").trim();
+      headers.push({
+        col,
+        make,
+        supplier,
+        basePrice: cellNum(RM_SHEET, `${col}${basePriceRow}`),
+        transportLabel,
+        transport: cellNum(RM_SHEET, `${col}${transportRow}`),
+      });
+    }
+    const rows: RMRow[] = [];
+    for (let r = range[0]; r <= range[1]; r++) {
+      const section = cellStr(RM_SHEET, `B${r}`);
+      const category = cellStr(RM_SHEET, `C${r}`);
+      if (!section) continue;
+      const prices: Record<string, number> = {};
+      for (const h of headers) {
+        const v = cellNum(RM_SHEET, `${h.col}${r}`);
+        if (v !== null) prices[h.col] = v;
+      }
+      rows.push({ row: r, section, category, prices });
+    }
+    return { key, title, headers, rows };
+  }
+
+  const blocks: RMPriceListBlock[] = [
+    readDisplayBlock("angles", "Angles", 7, 8, [9, 16], ["D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O"]),
+    readDisplayBlock("flats", "MS Flats", 22, 23, [24, 30], ["D", "E", "F", "G", "H", "I", "J"]),
+    readDisplayBlock("rounds", "MS Rounds", 36, 37, [38, 40], ["D", "E", "F", "G", "H", "I"]),
+    readDisplayBlock("rsj", "RSJ, WPB, Channels & Beams", 47, 48, [49, 75], ["D", "E", "F", "G", "H", "I", "J", "K"]),
+    readDisplayBlock("plate", "Plate", 82, 83, [84, 89], ["D", "E", "F"]),
+    readDisplayBlock("pipe", "Pipe", 96, 97, [98, 102], ["D", "E", "F", "G", "H"]),
+    readDisplayBlock("hardware", "Hardware (Nuts & Bolts)", 112, 113, [114, 119], ["D", "E", "F", "G", "H", "I"]),
+    readDisplayBlock("fbolts", "Foundation Bolts", 126, 127, [128, 130], ["D", "E", "F"]),
+  ];
+  const zincPrice = cellNum(BILLET_SHEET, "C6");
+  const rmDate = cellStr(BILLET_SHEET, "C4") || todayStr();
+  return { blocks, zincPrice, rmDate };
+}
+
 export function getDistinctMakes(rm: RMData): string[] {
   const set = new Set<string>();
   for (const b of [rm.angles, rm.flats, rm.rounds, rm.rsj, rm.plate, rm.pipe, rm.hardware, rm.fbolts]) {

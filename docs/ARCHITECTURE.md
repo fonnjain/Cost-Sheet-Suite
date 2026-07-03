@@ -101,6 +101,18 @@ Routing uses wouter, mounted under the Vite base path
   configuration for the 9 auto-populated billet and wire-rod cells (E9, F9,
   G9, I9, J9, K9, L9, D18, E18). Shows BASE | OFFSET (editable) | RESULT
   per cell; persists offsets to the `rm_offsets` table via `POST /api/rm-offsets`.
+- `/rm-price-list` — `src/pages/rm-price-list.tsx`: read-only "RM Price List"
+  tab mirroring the second worksheet of the source Excel file. Purely a
+  display of the same embedded RM data used elsewhere — no inputs, no save,
+  no effect on any calculation or quote. Built on `buildRMPriceListView()`
+  in `src/lib/v6/engine.ts`, a new function added alongside (not modifying)
+  `buildRMData()`: it reuses the same formula evaluator/overrides but also
+  surfaces the Base Price and Load+Transport+Brokerage/Transportation header
+  rows for display. Renders one card per material block (Angles, MS Flats,
+  MS Rounds, RSJ/WPB/Channels & Beams, Plate, Pipe, Hardware Nuts & Bolts,
+  Foundation Bolts) with supplier columns (name + make) and section-size
+  rows, a dash for missing prices, and the same RM date / zinc price shown
+  on the RM Prices console.
 - `/calculator` — `src/pages/calculator.tsx`: project info, structure picker,
   full cost build-up, save quote.
 - `/dashboard` — `src/pages/dashboard.tsx`: KPIs and charts.
