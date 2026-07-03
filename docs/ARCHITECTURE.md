@@ -316,6 +316,11 @@ The Drizzle client is created in `lib/db/src/index.ts` from a `pg` pool using
   `zincPrice`, `inputs` (jsonb), `costBreakdown` (jsonb), `generatedByName`,
   `notes`, `approved` (default false), `approvedAt`, `approvedByName`, `legacy`
   (default false), `createdAt`.
+- `rm_daily_locks` (`schema/rm_daily_locks.ts`): `id` (serial PK), `lockedDate`
+  (text, e.g. `2026-07-03`), `locked` (boolean, default true), `lockedByName`,
+  `createdAt`. Append-only; the GET endpoint reads the most-recent row for
+  `lockedDate` to decide whether the Daily RM panel is locked (auto-locked at
+  2:00 PM each day, or unlocked early by an admin).
 
 Relationships are expressed by ID columns (`sessions.userId -> users.id`,
 `quotes.customerId -> customers.id`) rather than enforced foreign keys in the

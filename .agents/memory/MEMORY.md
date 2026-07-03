@@ -3,5 +3,5 @@
 - [v6 make dropdowns](v6-make-dropdowns.md) — source calculator Make options from spec lists, not getDistinctMakes (it splits make tags on "/" and leaks Tested).
 - [v6 cost-sheet reconciliation](v6-reconciliation.md) — new quotes computed by v6 engine but stored in old flat shape via toLegacyShape; parity anchors 46231 / 76939@3%; data.ts auto-generated.
 - [Quote vendor-approval invariant](quote-approval.md) — at most one approved revision per customer+project; approve in one DB transaction; validate UI selection against loaded project.
-- [RQ cache invalidation in cost-sheet](rq-cache-invalidation.md) — QueryClient has 30s staleTime; mutations MUST invalidateQueries with generated query-key helpers or UI shows stale state until manual refresh.
-- [RM ratio editor row-sum validation](rm-ratio-editor-row-validation.md) — "row must sum to 100%" APIs must require the full key set, not just submitted keys, or partial payloads bypass the invariant.
+- [RQ cache invalidation in cost-sheet](rq-cache-invalidation.md) — mutations MUST invalidateQueries or UI shows stale state (30s staleTime).
+- [RM ratio row-sum validation](rm-ratio-editor-row-validation.md) — "sum to 100%" APIs must require the full key set or partial payloads bypass it.
