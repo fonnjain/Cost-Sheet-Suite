@@ -37,6 +37,9 @@ import type {
   RmOffsetsInput,
   RmPrices,
   RmPricesInput,
+  RmRatio,
+  RmRatioHistoryEntry,
+  RmRatiosInput,
   StructureCount,
   SuccessResponse,
   User,
@@ -1305,6 +1308,231 @@ export const useSaveRmOffsets = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getSaveRmOffsetsMutationOptions(options));
     }
+
+export const getGetRmRatiosUrl = () => {
+
+
+
+
+  return `/api/rm-ratios`
+}
+
+/**
+ * @summary Get current voltage-weighted RM ratios for all admin-editable structures
+ */
+export const getRmRatios = async ( options?: RequestInit): Promise<RmRatio[]> => {
+
+  return customFetch<RmRatio[]>(getGetRmRatiosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRmRatiosQueryKey = () => {
+    return [
+    `/api/rm-ratios`
+    ] as const;
+    }
+
+
+export const getGetRmRatiosQueryOptions = <TData = Awaited<ReturnType<typeof getRmRatios>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRmRatios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRmRatiosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRmRatios>>> = ({ signal }) => getRmRatios({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRmRatios>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRmRatiosQueryResult = NonNullable<Awaited<ReturnType<typeof getRmRatios>>>
+export type GetRmRatiosQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get current voltage-weighted RM ratios for all admin-editable structures
+ */
+
+export function useGetRmRatios<TData = Awaited<ReturnType<typeof getRmRatios>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRmRatios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRmRatiosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSaveRmRatiosUrl = () => {
+
+
+
+
+  return `/api/rm-ratios`
+}
+
+/**
+ * @summary Save the full ratio grid for one structure + voltage row (admin only)
+ */
+export const saveRmRatios = async (rmRatiosInput: RmRatiosInput, options?: RequestInit): Promise<RmRatio[]> => {
+
+  return customFetch<RmRatio[]>(getSaveRmRatiosUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      rmRatiosInput,)
+  }
+);}
+
+
+
+
+export const getSaveRmRatiosMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveRmRatios>>, TError,{data: BodyType<RmRatiosInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveRmRatios>>, TError,{data: BodyType<RmRatiosInput>}, TContext> => {
+
+const mutationKey = ['saveRmRatios'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveRmRatios>>, {data: BodyType<RmRatiosInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveRmRatios(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveRmRatiosMutationResult = NonNullable<Awaited<ReturnType<typeof saveRmRatios>>>
+    export type SaveRmRatiosMutationBody = BodyType<RmRatiosInput>
+    export type SaveRmRatiosMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Save the full ratio grid for one structure + voltage row (admin only)
+ */
+export const useSaveRmRatios = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveRmRatios>>, TError,{data: BodyType<RmRatiosInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveRmRatios>>,
+        TError,
+        {data: BodyType<RmRatiosInput>},
+        TContext
+      > => {
+      return useMutation(getSaveRmRatiosMutationOptions(options));
+    }
+
+export const getGetRmRatiosHistoryUrl = () => {
+
+
+
+
+  return `/api/rm-ratios/history`
+}
+
+/**
+ * @summary Get the change history for RM ratios (admin only)
+ */
+export const getRmRatiosHistory = async ( options?: RequestInit): Promise<RmRatioHistoryEntry[]> => {
+
+  return customFetch<RmRatioHistoryEntry[]>(getGetRmRatiosHistoryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRmRatiosHistoryQueryKey = () => {
+    return [
+    `/api/rm-ratios/history`
+    ] as const;
+    }
+
+
+export const getGetRmRatiosHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getRmRatiosHistory>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRmRatiosHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRmRatiosHistoryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRmRatiosHistory>>> = ({ signal }) => getRmRatiosHistory({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRmRatiosHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRmRatiosHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getRmRatiosHistory>>>
+export type GetRmRatiosHistoryQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get the change history for RM ratios (admin only)
+ */
+
+export function useGetRmRatiosHistory<TData = Awaited<ReturnType<typeof getRmRatiosHistory>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRmRatiosHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRmRatiosHistoryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListQuotesUrl = (params?: ListQuotesParams,) => {
   const normalizedParams = new URLSearchParams();

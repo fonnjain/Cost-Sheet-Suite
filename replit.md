@@ -32,6 +32,9 @@ A mobile-first internal costing tool for power transmission steel fabricators. A
 - `artifacts/api-server/src/routes/` — Express route handlers
 - `artifacts/api-server/src/middlewares/auth.ts` — session auth middleware
 - `artifacts/cost-sheet/src/pages/` — React pages (login, home, rm-prices, calculator, dashboard, review, admin)
+- `artifacts/cost-sheet/src/components/rm-ratio-editor.tsx` — admin-only editor for the 11 structures' voltage-weighted RM price ratios (row-sum-to-100% validation, per-cell change log)
+- `lib/db/src/schema/rm_ratios.ts`, `rm_ratio_history.ts` — current ratio values (unique per structureName+kv+category) and append-only change log
+- `artifacts/api-server/src/routes/rm-ratios.ts` — `GET /rm-ratios` (any authenticated user, needed for quote calc), `POST /rm-ratios` + `GET /rm-ratios/history` (admin only)
 - `artifacts/cost-sheet/src/lib/costCalculator.ts` — client-side cost calculation engine
 - `artifacts/cost-sheet/src/lib/auth.ts` — session token management (localStorage + setAuthTokenGetter)
 - `attached_assets/Clients_1780913725421.csv` — 844-client source CSV (seeded to DB)
@@ -42,6 +45,7 @@ A mobile-first internal costing tool for power transmission steel fabricators. A
 - **Twice-monthly window**: RM prices console has two panels. The twice-monthly panel (plates, coils) is locked unless today is 1st or 15th of the month, OR an admin has unlocked it explicitly via the admin panel.
 - **Quote revisions**: Auto-increments per (customerId + projectRef) combination. First quote = Rev 0, subsequent saves = Rev 1, Rev 2, etc.
 - **Client-side calculation**: The full cost build-up (steel → zinc → conversion → finance → contingency → credit → margin → quote price) is computed in the browser in real-time using `costCalculator.ts`. Only the final result + inputs are stored in the DB.
+- **Admin-editable RM ratios**: The voltage-weighted RM price ratios (per structure+kv+category) for 11 structures are admin-editable via the admin panel, row-sum-to-100% validated, and logged per-cell (who/what/old→new/when) to `rm_ratio_history`. Seeded to the exact hardcoded `MASTER_SPECS` defaults, so nothing changes until an admin edits a value. Only the spec object fed into `calculateRMPrice` is overridden client-side — the engine and previously saved quotes are never touched, so this only affects new quotes going forward.
 - **Contract-first API**: OpenAPI spec is the single source of truth. Always run codegen after spec changes.
 
 ## Product

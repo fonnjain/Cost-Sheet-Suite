@@ -3,5 +3,7 @@ export * from "./customers";
 export * from "./rm_prices";
 export * from "./rm_offsets";
 export * from "./rm_daily_locks";
+export * from "./rm_ratios";
+export * from "./rm_ratio_history";
 export * from "./quotes";
 export * from "./sessions";

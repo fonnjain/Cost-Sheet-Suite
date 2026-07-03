@@ -1,7 +1,44 @@
 import { db } from "@workspace/db";
-import { usersTable, customersTable, rmPricesTable } from "@workspace/db/schema";
+import { usersTable, customersTable, rmPricesTable, rmRatiosTable } from "@workspace/db/schema";
 import { readFileSync } from "fs";
 import path from "path";
+
+// Voltage-weighted RM price ratios -- the purple "Fixed as per template
+// creator" values in the workbook. Traced verbatim from MASTER_SPECS in
+// artifacts/cost-sheet/src/lib/v6/data.ts so that, at these defaults, every
+// quote is unchanged to the rupee. Category keys are copied exactly as they
+// appear per structure (note "Channels" vs "Channel" differ by structure).
+const FIVE_CAT_RATIOS: Record<string, Record<string, number>> = {
+  "33 / 66 / 110 / 132": { "Light Angle": 0.59, "Medium Angle": 0.26, "Heavy Angle": 0.1, "Super Heavy Angle": 0, Plate: 0.05 },
+  "220 / 330 / 400": { "Light Angle": 0.33, "Medium Angle": 0.21, "Heavy Angle": 0.22, "Super Heavy Angle": 0.18, Plate: 0.06 },
+  "765 / 800": { "Light Angle": 0, "Medium Angle": 0.2, "Heavy Angle": 0.25, "Super Heavy Angle": 0.45, Plate: 0.1 },
+};
+
+const SIX_CAT_RATIOS_CHANNELS: Record<string, Record<string, number>> = {
+  "33 / 66 / 110 / 132": { "Light Angle": 0.5, "Medium Angle": 0.16, "Heavy Angle": 0.13, "Super Heavy Angle": 0, Channels: 0.1, Plate: 0.11 },
+  "220 / 330 / 400": { "Light Angle": 0.39, "Medium Angle": 0.16, "Heavy Angle": 0.16, "Super Heavy Angle": 0.1, Channels: 0.02, Plate: 0.17 },
+  "765 / 800": { "Light Angle": 0.25, "Medium Angle": 0.25, "Heavy Angle": 0.17, "Super Heavy Angle": 0.18, Channels: 0.01, Plate: 0.14 },
+};
+
+const SIX_CAT_RATIOS_CHANNEL: Record<string, Record<string, number>> = {
+  "33 / 66 / 110 / 132": { "Light Angle": 0.5, "Medium Angle": 0.16, "Heavy Angle": 0.13, "Super Heavy Angle": 0, Channel: 0.1, Plate: 0.11 },
+  "220 / 330 / 400": { "Light Angle": 0.39, "Medium Angle": 0.16, "Heavy Angle": 0.16, "Super Heavy Angle": 0.1, Channel: 0.02, Plate: 0.17 },
+  "765 / 800": { "Light Angle": 0.25, "Medium Angle": 0.25, "Heavy Angle": 0.17, "Super Heavy Angle": 0.18, Channel: 0.01, Plate: 0.14 },
+};
+
+const RM_RATIO_STRUCTURES: { structureName: string; ratiosByKv: Record<string, Record<string, number>> }[] = [
+  { structureName: "TLT >800 mt", ratiosByKv: FIVE_CAT_RATIOS },
+  { structureName: "TLT 401-800 mt", ratiosByKv: FIVE_CAT_RATIOS },
+  { structureName: "TLT 151 - 400 mt ", ratiosByKv: FIVE_CAT_RATIOS },
+  { structureName: "Sub-Station (L) >800 mt ", ratiosByKv: FIVE_CAT_RATIOS },
+  { structureName: "Sub-Station (L) 401- 800 mt", ratiosByKv: FIVE_CAT_RATIOS },
+  { structureName: "Sub Station (L) - 151 - 400 mt ", ratiosByKv: FIVE_CAT_RATIOS },
+  { structureName: "out source < 150 mt ", ratiosByKv: FIVE_CAT_RATIOS },
+  { structureName: "A  H-Pole", ratiosByKv: SIX_CAT_RATIOS_CHANNELS },
+  { structureName: "RSJ Pole - Base Plate ", ratiosByKv: SIX_CAT_RATIOS_CHANNEL },
+  { structureName: "Rural (Welded & Clamps)", ratiosByKv: SIX_CAT_RATIOS_CHANNELS },
+  { structureName: "Rural (Non-Welded)", ratiosByKv: SIX_CAT_RATIOS_CHANNELS },
+];
 
 const ALLOWED_USERS = [
   { email: "varunp@vijaytransmission.com", name: "Varun P", role: "user" },
@@ -83,6 +120,23 @@ async function seed() {
     console.log("Seeded initial RM prices.");
   } else {
     console.log("RM prices already exist, skipping.");
+  }
+
+  console.log("Seeding RM ratios (voltage-weighted RM price grid)...");
+  const [existingRatio] = await db.select().from(rmRatiosTable).limit(1);
+  if (!existingRatio) {
+    const rows: (typeof rmRatiosTable.$inferInsert)[] = [];
+    for (const { structureName, ratiosByKv } of RM_RATIO_STRUCTURES) {
+      for (const [kv, ratios] of Object.entries(ratiosByKv)) {
+        for (const [category, ratioValue] of Object.entries(ratios)) {
+          rows.push({ structureName, kv, category, ratioValue, updatedByName: "System" });
+        }
+      }
+    }
+    await db.insert(rmRatiosTable).values(rows).onConflictDoNothing();
+    console.log(`Seeded ${rows.length} RM ratio rows across ${RM_RATIO_STRUCTURES.length} structures.`);
+  } else {
+    console.log("RM ratios already exist, skipping.");
   }
 
   console.log("Seeding customers from CSV...");

@@ -118,8 +118,9 @@ Routing uses wouter, mounted under the Vite base path
 - `/dashboard` — `src/pages/dashboard.tsx`: KPIs and charts.
 - `/review` — `src/pages/review.tsx`: compare all revisions for a
   client + project; approve a revision; legacy-quote messaging.
-- `/admin` — `src/pages/admin.tsx`: user management and twice-monthly window
-  unlock (admin only).
+- `/admin` — `src/pages/admin.tsx`: user management, twice-monthly window
+  unlock (admin only), and the RM Ratio Editor (`src/components/rm-ratio-editor.tsx`,
+  admin only) for the 11 structures with voltage-weighted RM price ratios.
 - Fallback — `src/pages/not-found.tsx`.
 
 All non-login routes render inside `src/components/layout.tsx`.
@@ -172,6 +173,21 @@ relevant modules:
 
 Only the final result plus the inputs are stored in the database; the
 calculation itself is not run on the server.
+
+### Admin-editable RM ratios
+
+For the `tlt5`/`subp`-schema structures (voltage-weighted RM price build-up),
+the per-category percentage ratios used to blend RM prices are admin-editable
+rather than fully hardcoded. `calculator.tsx` builds an `effectiveSpec` (a
+shallow clone of the `MASTER_SPECS` entry) by fetching `GET /api/rm-ratios` and
+overlaying any saved `(structureName, kv, category)` values onto the spec's
+`ratios.kv_options[].ratios` object, falling back to the hardcoded
+`MASTER_SPECS` values when the fetch hasn't landed or a row is missing.
+`effectiveSpec` — never the raw `spec` — is what gets passed into
+`calculateCostSheet`/`calculateRMPrice`; those engine functions themselves are
+never modified. This only affects quotes computed going forward: saved quotes
+store their computed result and inputs, so past quotes are never retroactively
+recalculated.
 
 ## 5. API architecture (`artifacts/api-server`)
 
@@ -230,6 +246,19 @@ via middleware unless noted.
   - `POST /api/rm-offsets` — inserts a new offset snapshot, validated with
     the generated `SaveRmOffsetsBody` Zod schema. Each save is appended; the
     GET always reads the most-recent row (append-only audit trail).
+- `src/routes/rm-ratios.ts`:
+  - `GET /api/rm-ratios` — `requireAuth` only (not admin-gated): every user's
+    quote calculation needs the current ratios, and the values already ship in
+    the client JS bundle via `MASTER_SPECS`, so they aren't secret. Returns all
+    `(structureName, kv, category)` rows.
+  - `POST /api/rm-ratios` (admin only) — upserts the full ratio row for one
+    `(structureName, kv)`, validated with the generated `SaveRmRatiosBody` Zod
+    schema. Rejects if any value is outside `[0, 1]` or the row doesn't sum to
+    ~100% (0.5% float tolerance). Diffs each category against the current DB
+    value and appends a row to `rm_ratio_history` only for categories that
+    actually changed.
+  - `GET /api/rm-ratios/history` (admin only) — last 100 change-log rows,
+    newest first.
 - `src/routes/quotes.ts`:
   - `GET /api/quotes` — list with optional `customerId` / `projectRef` filters.
   - `POST /api/quotes` — create; auto-assigns the next revision (see below).
@@ -270,6 +299,17 @@ The Drizzle client is created in `lib/db/src/index.ts` from a `pg` pool using
   most-recent row. Stores the 9 additive offset constants that control the
   auto-populated billet and wire-rod cells; defaults fall back to
   `DEFAULT_OFFSETS` in `engine.ts` when no row exists.
+- `rm_ratios` (`schema/rm_ratios.ts`): `id` (serial PK), `structureName`,
+  `kv`, `category`, `ratioValue` (real, fraction 0-1), `updatedByName`,
+  `updatedAt`. Unique on `(structureName, kv, category)` — this is the
+  current-value table, upserted on save. Seeded with the exact `MASTER_SPECS`
+  defaults for the 11 admin-editable structures so nothing changes until an
+  admin edits a value.
+- `rm_ratio_history` (`schema/rm_ratio_history.ts`): `id` (serial PK),
+  `structureName`, `kv`, `category`, `oldValue` (nullable — null on first
+  write for a cell), `newValue`, `changedByName`, `changedAt`. Append-only;
+  one row per changed cell per save (unchanged cells in the same save don't
+  get a history row).
 - `quotes` (`schema/quotes.ts`): `id` (serial PK), `customerId`, `customerName`
   (denormalized for query performance), `projectRef`, `revision` (default 0),
   `structureType`, `kvOption`, `quotePricePerMt`, `totalCost`, `steelPrice`,
@@ -340,6 +380,11 @@ typecheck:libs` before checking the leaf artifact packages.
   computed in the browser by the v6 engine, then mapped via `toLegacyShape`
   into a flat shape before storage so display code stays stable. Only the final
   result and inputs are persisted.
+- Admin-editable RM ratios: voltage-weighted RM price ratios for 11 structures
+  are admin-editable (row-sum-to-100% validated, per-cell history logged) but
+  seeded to the exact `MASTER_SPECS` defaults so nothing changes until an admin
+  edits a value. Only the spec object fed into `calculateRMPrice` is
+  overridden; the engine functions and previously saved quotes are untouched.
 - DB-persisted RM offsets: the 9 additive constants that derive auto-populated
   billet/wire-rod cell values (E9, F9, G9, I9, J9, K9, L9, D18, E18) from the
   daily input prices are stored in `rm_offsets` and editable via the RM Data

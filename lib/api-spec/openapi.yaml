@@ -19,6 +19,8 @@ tags:
     description: Raw material prices
   - name: rmOffsets
     description: RM price offset configuration
+  - name: rmRatios
+    description: Admin-editable voltage-weighted RM price ratios
   - name: quotes
     description: Quote management
   - name: dashboard
@@ -315,6 +317,73 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RmOffsets"
+
+  /rm-ratios:
+    get:
+      operationId: getRmRatios
+      tags: [rmRatios]
+      summary: Get current voltage-weighted RM ratios for all admin-editable structures
+      responses:
+        "200":
+          description: Current ratio rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RmRatio"
+    post:
+      operationId: saveRmRatios
+      tags: [rmRatios]
+      summary: Save the full ratio grid for one structure + voltage row (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RmRatiosInput"
+      responses:
+        "200":
+          description: Ratios saved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RmRatio"
+        "400":
+          description: Validation error (row does not sum to 100%, or a value is out of range)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /rm-ratios/history:
+    get:
+      operationId: getRmRatiosHistory
+      tags: [rmRatios]
+      summary: Get the change history for RM ratios (admin only)
+      responses:
+        "200":
+          description: Recent ratio changes, most recent first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RmRatioHistoryEntry"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /quotes:
     get:
@@ -652,6 +721,61 @@ components:
       properties:
         offsetData:
           type: object
+
+    RmRatio:
+      type: object
+      required: [structureName, kv, category, ratioValue, updatedByName, updatedAt]
+      properties:
+        structureName:
+          type: string
+          description: Exact MASTER_SPECS structure key, including any trailing/double spaces
+        kv:
+          type: string
+          description: Voltage row key, e.g. "33 / 66 / 110 / 132"
+        category:
+          type: string
+          description: Exact ratio category key for this structure (e.g. "Channels" or "Channel" -- varies per structure)
+        ratioValue:
+          type: number
+          description: Fraction between 0 and 1 (displayed in the UI as a percentage)
+        updatedByName:
+          type: string
+        updatedAt:
+          type: string
+
+    RmRatiosInput:
+      type: object
+      required: [structureName, kv, ratios]
+      properties:
+        structureName:
+          type: string
+        kv:
+          type: string
+        ratios:
+          type: object
+          description: Map of category name -> fraction (0-1). Must sum to 1.0 (100%).
+          additionalProperties:
+            type: number
+
+    RmRatioHistoryEntry:
+      type: object
+      required: [structureName, kv, category, newValue, changedByName, changedAt]
+      properties:
+        structureName:
+          type: string
+        kv:
+          type: string
+        category:
+          type: string
+        oldValue:
+          type: number
+          nullable: true
+        newValue:
+          type: number
+        changedByName:
+          type: string
+        changedAt:
+          type: string
 
     WindowToggleInput:
       type: object

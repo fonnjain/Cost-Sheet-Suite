@@ -5,6 +5,7 @@ import usersRouter from "./users";
 import customersRouter from "./customers";
 import rmPricesRouter from "./rm-prices";
 import rmOffsetsRouter from "./rm-offsets";
+import rmRatiosRouter from "./rm-ratios";
 import quotesRouter from "./quotes";
 import dashboardRouter from "./dashboard";
 
@@ -16,6 +17,7 @@ router.use(usersRouter);
 router.use(customersRouter);
 router.use(rmPricesRouter);
 router.use(rmOffsetsRouter);
+router.use(rmRatiosRouter);
 router.use(quotesRouter);
 router.use(dashboardRouter);
 

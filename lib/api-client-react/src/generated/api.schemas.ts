@@ -133,6 +133,41 @@ export interface RmOffsetsInput {
   offsetData: RmOffsetsInputOffsetData;
 }
 
+export interface RmRatio {
+  /** Exact MASTER_SPECS structure key, including any trailing/double spaces */
+  structureName: string;
+  /** Voltage row key, e.g. "33 / 66 / 110 / 132" */
+  kv: string;
+  /** Exact ratio category key for this structure (e.g. "Channels" or "Channel" -- varies per structure) */
+  category: string;
+  /** Fraction between 0 and 1 (displayed in the UI as a percentage) */
+  ratioValue: number;
+  updatedByName: string;
+  updatedAt: string;
+}
+
+/**
+ * Map of category name -> fraction (0-1). Must sum to 1.0 (100%).
+ */
+export type RmRatiosInputRatios = {[key: string]: number};
+
+export interface RmRatiosInput {
+  structureName: string;
+  kv: string;
+  /** Map of category name -> fraction (0-1). Must sum to 1.0 (100%). */
+  ratios: RmRatiosInputRatios;
+}
+
+export interface RmRatioHistoryEntry {
+  structureName: string;
+  kv: string;
+  category: string;
+  oldValue?: number | null;
+  newValue: number;
+  changedByName: string;
+  changedAt: string;
+}
+
 export interface WindowToggleInput {
   /** Desired window state. Defaults to true (unlock) for backward compatibility. */
   unlocked?: boolean;

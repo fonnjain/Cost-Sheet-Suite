@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
 import { formatINR } from "@/lib/costCalculator";
 import { buildRMData, calculateCostSheet, buildDefaultInputs, computeAutoOverrides, getDistinctMakes, MASTER_SPECS } from "@/lib/v6/engine";
-import { useGetRmOffsets } from "@workspace/api-client-react";
+import { useGetRmOffsets, useGetRmRatios } from "@workspace/api-client-react";
 import { toLegacyShape } from "@/lib/v6/legacy";
 import { ChevronRight, ChevronLeft, Check, Plus, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -115,6 +115,7 @@ export default function Calculator() {
   const createQuote = useCreateQuote();
   const { data: rmPrices } = useGetRmPrices();
   const { data: rmOffsets } = useGetRmOffsets();
+  const { data: rmRatios } = useGetRmRatios();
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState(1);
@@ -160,6 +161,31 @@ export default function Calculator() {
   const isHwfast = schema === "hwfast";
   const isRailc = schema === "railc";
   const isManual = !!spec && !isKvSchema && !isHwfast && !isRailc;
+
+  // Admin-editable voltage-weighted RM ratios: overlay the DB-saved values onto
+  // a clone of the hardcoded spec so new quotes pick up the latest admin edits.
+  // Falls back to the MASTER_SPECS defaults if the fetch hasn't landed yet or a
+  // structure+kv row is missing from the DB. calculateRMPrice / calculateCostSheet
+  // are never modified -- only the spec object fed into them.
+  const effectiveSpec = useMemo(() => {
+    if (!spec || !isKvSchema || !structureType) return spec;
+    const ratioRows = (rmRatios ?? []) as { structureName: string; kv: string; category: string; ratioValue: number }[];
+    const overridesForStructure = ratioRows.filter((r) => r.structureName === structureType);
+    if (overridesForStructure.length === 0) return spec;
+
+    const kvOptions = (spec.ratios?.kv_options ?? []) as { kv: string; ratios: Record<string, number> }[];
+    const overriddenKvOptions = kvOptions.map((opt) => {
+      const rowsForKv = overridesForStructure.filter((r) => r.kv === opt.kv);
+      if (rowsForKv.length === 0) return opt;
+      const overriddenRatios = { ...opt.ratios };
+      for (const row of rowsForKv) {
+        if (row.category in overriddenRatios) overriddenRatios[row.category] = row.ratioValue;
+      }
+      return { ...opt, ratios: overriddenRatios };
+    });
+
+    return { ...spec, ratios: { ...spec.ratios, kv_options: overriddenKvOptions } };
+  }, [spec, isKvSchema, structureType, rmRatios]);
 
   // Railways (channel) Make options: the v6 "full supplier list" (default CORE),
   // de-duplicated case-insensitively so the internal "TESTED"/"Tested" pair shows
@@ -297,13 +323,13 @@ export default function Calculator() {
             : false);
 
   const results = useMemo(() => {
-    if (!spec || !step2Complete) return null;
+    if (!effectiveSpec || !step2Complete) return null;
     try {
-      return calculateCostSheet(rm, spec, inputs);
+      return calculateCostSheet(rm, effectiveSpec, inputs);
     } catch {
       return null;
     }
-  }, [rm, spec, inputs, step2Complete]);
+  }, [rm, effectiveSpec, inputs, step2Complete]);
 
   const quotePrice = results?.margins[selectedMarginIdx]?.quote ?? 0;
 

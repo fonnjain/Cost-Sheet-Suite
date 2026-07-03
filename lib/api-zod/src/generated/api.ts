@@ -235,6 +235,55 @@ export const SaveRmOffsetsBody = zod.object({
 
 
 /**
+ * @summary Get current voltage-weighted RM ratios for all admin-editable structures
+ */
+export const GetRmRatiosResponseItem = zod.object({
+  "structureName": zod.string().describe('Exact MASTER_SPECS structure key, including any trailing\/double spaces'),
+  "kv": zod.string().describe('Voltage row key, e.g. \"33 \/ 66 \/ 110 \/ 132\"'),
+  "category": zod.string().describe('Exact ratio category key for this structure (e.g. \"Channels\" or \"Channel\" -- varies per structure)'),
+  "ratioValue": zod.number().describe('Fraction between 0 and 1 (displayed in the UI as a percentage)'),
+  "updatedByName": zod.string(),
+  "updatedAt": zod.string()
+})
+export const GetRmRatiosResponse = zod.array(GetRmRatiosResponseItem)
+
+
+/**
+ * @summary Save the full ratio grid for one structure + voltage row (admin only)
+ */
+export const SaveRmRatiosBody = zod.object({
+  "structureName": zod.string(),
+  "kv": zod.string(),
+  "ratios": zod.record(zod.string(), zod.number()).describe('Map of category name -> fraction (0-1). Must sum to 1.0 (100%).')
+})
+
+export const SaveRmRatiosResponseItem = zod.object({
+  "structureName": zod.string().describe('Exact MASTER_SPECS structure key, including any trailing\/double spaces'),
+  "kv": zod.string().describe('Voltage row key, e.g. \"33 \/ 66 \/ 110 \/ 132\"'),
+  "category": zod.string().describe('Exact ratio category key for this structure (e.g. \"Channels\" or \"Channel\" -- varies per structure)'),
+  "ratioValue": zod.number().describe('Fraction between 0 and 1 (displayed in the UI as a percentage)'),
+  "updatedByName": zod.string(),
+  "updatedAt": zod.string()
+})
+export const SaveRmRatiosResponse = zod.array(SaveRmRatiosResponseItem)
+
+
+/**
+ * @summary Get the change history for RM ratios (admin only)
+ */
+export const GetRmRatiosHistoryResponseItem = zod.object({
+  "structureName": zod.string(),
+  "kv": zod.string(),
+  "category": zod.string(),
+  "oldValue": zod.number().nullish(),
+  "newValue": zod.number(),
+  "changedByName": zod.string(),
+  "changedAt": zod.string()
+})
+export const GetRmRatiosHistoryResponse = zod.array(GetRmRatiosHistoryResponseItem)
+
+
+/**
  * @summary List all quotes with optional filters
  */
 export const ListQuotesQueryParams = zod.object({
