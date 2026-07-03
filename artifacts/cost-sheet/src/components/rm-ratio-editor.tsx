@@ -12,7 +12,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { MASTER_SPECS } from "@/lib/v6/engine";
 import { format } from "date-fns";
@@ -106,43 +105,69 @@ function KvRowEditor({ structureName, kv, categories, initialValues }: { structu
   };
 
   return (
-    <div className="border border-border/50 rounded-md p-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="font-mono text-sm text-muted-foreground">{kv}</span>
-        <span className={`text-xs font-mono ${sumOk ? "text-emerald-500" : "text-destructive"}`}>
-          Sum: {sum.toFixed(1)}%
+    <div
+      className={`rounded-lg border p-4 space-y-3 transition-colors ${
+        dirty
+          ? sumOk
+            ? "border-accent/50 bg-accent/[0.04]"
+            : "border-destructive/50 bg-destructive/[0.04]"
+          : "border-border/50 bg-card/40"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-sm font-bold px-2 py-0.5 rounded bg-muted/60 border border-border/50 whitespace-nowrap">
+          {kv}
+        </span>
+        <span
+          className={`text-xs font-mono px-2 py-0.5 rounded-full border whitespace-nowrap ${
+            sumOk
+              ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
+              : "text-destructive border-destructive/40 bg-destructive/10"
+          }`}
+        >
+          {sum.toFixed(1)}%
         </span>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+
+      <div className="space-y-2">
         {categories.map((cat) => (
-          <div key={cat} className="space-y-1">
-            <label className="text-xs text-muted-foreground">{cat}</label>
-            <div className="relative">
+          <div key={cat} className="flex items-center gap-3">
+            <label className="text-sm text-muted-foreground flex-1 leading-tight">{cat}</label>
+            <div className="relative w-24 shrink-0">
               <Input
                 type="number"
                 step="0.01"
                 value={values[cat]}
                 onChange={(e) => handleChange(cat, e.target.value)}
-                className="font-mono text-sm pr-6"
+                className="font-mono text-sm text-right pr-7 h-9"
               />
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                %
+              </span>
             </div>
           </div>
         ))}
       </div>
-      {!sumOk && (
-        <Alert variant="destructive" className="py-2">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription className="text-xs">Row must sum to 100% before saving.</AlertDescription>
-        </Alert>
+
+      {dirty && !sumOk && (
+        <p className="flex items-center gap-1.5 text-xs text-destructive">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          Row must total 100% before saving.
+        </p>
       )}
+
       <Button
         size="sm"
         onClick={handleSave}
         disabled={!dirty || saveRatios.isPending || !sumOk}
-        className="w-full font-bold bg-accent hover:bg-accent/90 text-accent-foreground"
+        variant={dirty ? "default" : "outline"}
+        className={
+          dirty
+            ? "w-full font-bold bg-accent hover:bg-accent/90 text-accent-foreground"
+            : "w-full font-medium text-muted-foreground border-border/50"
+        }
       >
-        {saveRatios.isPending ? "Saving..." : "Save Row"}
+        {saveRatios.isPending ? "Saving..." : dirty ? "Save Row" : "No changes"}
       </Button>
     </div>
   );
@@ -184,8 +209,10 @@ export function RmRatioEditor() {
     <>
       <Card className="border-border/50">
         <CardHeader className="bg-card/50 border-b border-border/50">
-          <div className="flex items-center gap-2">
-            <Scale className="h-5 w-5 text-primary" />
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
+              <Scale className="h-5 w-5" />
+            </span>
             <CardTitle>Raw Material Ratio Editor</CardTitle>
           </div>
           <CardDescription>
@@ -193,26 +220,36 @@ export function RmRatioEditor() {
             quotes going forward — existing saved quotes and revisions are never recalculated.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 pt-4">
-          <Select value={selectedStructure} onValueChange={setSelectedStructure}>
-            <SelectTrigger className="w-full sm:w-[360px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {RATIO_STRUCTURES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s.trim()}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <CardContent className="space-y-5 pt-5">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Structure</label>
+            <div className="flex flex-wrap items-center gap-3">
+              <Select value={selectedStructure} onValueChange={setSelectedStructure}>
+                <SelectTrigger className="w-full sm:w-[360px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {RATIO_STRUCTURES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s.trim()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!isLoading && kvGroups.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {kvGroups.length} voltage {kvGroups.length === 1 ? "band" : "bands"}
+                </span>
+              )}
+            </div>
+          </div>
 
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading ratios...</p>
+            <p className="text-sm text-muted-foreground">Loading ratios…</p>
           ) : kvGroups.length === 0 ? (
             <p className="text-sm text-muted-foreground">No ratio rows found for this structure.</p>
           ) : (
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {kvGroups.map((group) => (
                 <KvRowEditor
                   key={`${selectedStructure}-${group.kv}`}
@@ -229,8 +266,10 @@ export function RmRatioEditor() {
 
       <Card className="border-border/50">
         <CardHeader className="bg-card/50 border-b border-border/50">
-          <div className="flex items-center gap-2">
-            <History className="h-5 w-5 text-muted-foreground" />
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
+              <History className="h-5 w-5" />
+            </span>
             <CardTitle>RM Ratio Change Log</CardTitle>
           </div>
           <CardDescription>Who changed which cell, and when.</CardDescription>
@@ -259,8 +298,12 @@ export function RmRatioEditor() {
                     <TableCell className="text-sm">{h.structureName.trim()}</TableCell>
                     <TableCell className="font-mono text-xs">{h.kv}</TableCell>
                     <TableCell className="text-sm">{h.category}</TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {h.oldValue === null || h.oldValue === undefined ? "—" : `${(h.oldValue * 100).toFixed(1)}%`} &rarr; {(h.newValue * 100).toFixed(1)}%
+                    <TableCell className="font-mono text-sm whitespace-nowrap">
+                      <span className="text-muted-foreground">
+                        {h.oldValue === null || h.oldValue === undefined ? "—" : `${(h.oldValue * 100).toFixed(1)}%`}
+                      </span>
+                      <span className="mx-1 text-muted-foreground/60">&rarr;</span>
+                      <span className="font-bold text-foreground">{(h.newValue * 100).toFixed(1)}%</span>
                     </TableCell>
                     <TableCell className="pr-4 text-sm">{h.changedByName}</TableCell>
                   </TableRow>
