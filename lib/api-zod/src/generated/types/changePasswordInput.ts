@@ -6,8 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface LoginInput {
-  email: string;
+export interface ChangePasswordInput {
   /** @minLength 1 */
-  password: string;
+  currentPassword: string;
+  /** @minLength 8 */
+  newPassword: string;
 }

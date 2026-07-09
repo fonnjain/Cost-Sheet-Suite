@@ -31,7 +31,8 @@ A mobile-first internal costing tool for power transmission steel fabricators. A
 - `lib/db/src/schema/` — DB schema (users, customers, rm_prices, quotes, sessions)
 - `artifacts/api-server/src/routes/` — Express route handlers
 - `artifacts/api-server/src/middlewares/auth.ts` — session auth middleware
-- `artifacts/cost-sheet/src/pages/` — React pages (login, home, rm-prices, calculator, dashboard, review, admin)
+- `artifacts/cost-sheet/src/pages/` — React pages (login, change-password, home, rm-prices, calculator, dashboard, review, admin)
+- `GET /users/activity` (admin only) — per-user quote log (count + customer/project/revision/date), shown as the "User Quote Activity" card in the admin panel
 - `artifacts/cost-sheet/src/components/rm-ratio-editor.tsx` — admin-only editor for the 11 structures' voltage-weighted RM price ratios (row-sum-to-100% validation, per-cell change log)
 - `lib/db/src/schema/rm_ratios.ts`, `rm_ratio_history.ts` — current ratio values (unique per structureName+kv+category) and append-only change log
 - `artifacts/api-server/src/routes/rm-ratios.ts` — `GET /rm-ratios` (any authenticated user, needed for quote calc), `POST /rm-ratios` + `GET /rm-ratios/history` (admin only)
@@ -41,7 +42,7 @@ A mobile-first internal costing tool for power transmission steel fabricators. A
 
 ## Architecture decisions
 
-- **Email-only auth**: No passwords — just email lookup against an allowlist. Session tokens stored in DB, sent as `Authorization: Bearer <token>` header. Token persisted in localStorage.
+- **Email + password auth**: Email lookup against an allowlist plus a password. Every user starts on the default password `Vtpl@2026` (`password_hash` NULL in DB = still on default) and must change it on first logon (`must_change_password` flag). User-set passwords are bcrypt-hashed. The forced change is enforced server-side in `requireAuth` (only `/auth/change-password`, `/auth/logout`, `/auth/me` allowed while pending) and client-side via a `/change-password` page redirect. Session tokens stored in DB, sent as `Authorization: Bearer <token>` header. Token persisted in localStorage.
 - **Twice-monthly window**: RM prices console has two panels. The twice-monthly panel (plates, coils) is locked unless today is 1st or 15th of the month, OR an admin has unlocked it explicitly via the admin panel.
 - **Quote revisions**: Auto-increments per (customerId + projectRef) combination. First quote = Rev 0, subsequent saves = Rev 1, Rev 2, etc.
 - **Client-side calculation**: The full cost build-up (steel → zinc → conversion → finance → contingency → credit → margin → quote price) is computed in the browser in real-time using `costCalculator.ts`. Only the final result + inputs are stored in the DB.

@@ -26,6 +26,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoading && (isError || !user)) {
       setLocation("/login");
+    } else if (!isLoading && user?.mustChangePassword) {
+      setLocation("/change-password");
     }
   }, [user, isLoading, isError, setLocation]);
 

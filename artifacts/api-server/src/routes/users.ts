@@ -1,16 +1,59 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db/schema";
+import { usersTable, quotesTable } from "@workspace/db/schema";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import {
   CreateUserBody,
   UpdateUserBody,
   UpdateUserParams,
   DeleteUserParams,
+  GetUserActivityResponse,
 } from "@workspace/api-zod";
 
 const router = Router();
+
+router.get("/users/activity", requireAuth, requireAdmin, async (_req, res): Promise<void> => {
+  const quotes = await db
+    .select({
+      id: quotesTable.id,
+      customerName: quotesTable.customerName,
+      projectRef: quotesTable.projectRef,
+      revision: quotesTable.revision,
+      structureType: quotesTable.structureType,
+      generatedByName: quotesTable.generatedByName,
+      createdAt: quotesTable.createdAt,
+    })
+    .from(quotesTable)
+    .orderBy(desc(quotesTable.createdAt));
+
+  const byUser = new Map<string, typeof quotes>();
+  for (const q of quotes) {
+    const list = byUser.get(q.generatedByName);
+    if (list) {
+      list.push(q);
+    } else {
+      byUser.set(q.generatedByName, [q]);
+    }
+  }
+
+  const activity = Array.from(byUser.entries())
+    .map(([userName, userQuotes]) => ({
+      userName,
+      quoteCount: userQuotes.length,
+      quotes: userQuotes.map((q) => ({
+        id: q.id,
+        customerName: q.customerName,
+        projectRef: q.projectRef,
+        revision: q.revision,
+        structureType: q.structureType,
+        createdAt: q.createdAt.toISOString(),
+      })),
+    }))
+    .sort((a, b) => b.quoteCount - a.quoteCount);
+
+  res.json(GetUserActivityResponse.parse(activity));
+});
 
 router.get("/users", requireAuth, requireAdmin, async (_req, res): Promise<void> => {
   const users = await db

@@ -7,6 +7,7 @@
  */
 
 export * from './authResponse';
+export * from './changePasswordInput';
 export * from './customer';
 export * from './customerInput';
 export * from './dailyLockInput';
@@ -40,6 +41,8 @@ export * from './rmRatiosInputRatios';
 export * from './structureCount';
 export * from './successResponse';
 export * from './user';
+export * from './userActivity';
+export * from './userActivityQuote';
 export * from './userInput';
 export * from './userInputRole';
 export * from './userQuoteCount';

@@ -21,6 +21,15 @@ export interface SuccessResponse {
 
 export interface LoginInput {
   email: string;
+  /** @minLength 1 */
+  password: string;
+}
+
+export interface ChangePasswordInput {
+  /** @minLength 1 */
+  currentPassword: string;
+  /** @minLength 8 */
+  newPassword: string;
 }
 
 export type UserRole = typeof UserRole[keyof typeof UserRole];
@@ -37,11 +46,27 @@ export interface User {
   name: string;
   role: UserRole;
   isActive: boolean;
+  mustChangePassword?: boolean;
   createdAt?: string;
 }
 
 export interface AuthResponse {
   user: User;
+}
+
+export interface UserActivityQuote {
+  id: number;
+  customerName: string;
+  projectRef: string;
+  revision: number;
+  structureType: string;
+  createdAt: string;
+}
+
+export interface UserActivity {
+  userName: string;
+  quoteCount: number;
+  quotes: UserActivityQuote[];
 }
 
 export type UserInputRole = typeof UserInputRole[keyof typeof UserInputRole];

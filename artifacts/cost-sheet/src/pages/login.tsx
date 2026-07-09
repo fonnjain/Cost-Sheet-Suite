@@ -12,19 +12,25 @@ const ALLOWED_USER_NAMES = ["Varun", "Sambit", "Rajesh", "Sundar", "Bunty", "San
 
 export default function Login() {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const login = useLogin();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    if (!email || !password) return;
 
     try {
-      const response = await login.mutateAsync({ data: { email } });
-      const raw = response as unknown as { token?: string };
+      const response = await login.mutateAsync({ data: { email, password } });
+      const raw = response as unknown as { token?: string; user?: { mustChangePassword?: boolean } };
       if (raw.token) {
         storeToken(raw.token);
+      }
+      if (raw.user?.mustChangePassword) {
+        toast({ title: "Welcome", description: "Please set a new password to continue" });
+        setLocation("/change-password");
+        return;
       }
       toast({ title: "Welcome back", description: "Logged in successfully" });
       setLocation("/");
@@ -43,7 +49,7 @@ export default function Login() {
             <span className="font-bold tracking-tight text-xl">VIJAY TRANSMISSION</span>
           </div>
           <CardTitle className="text-2xl tracking-tight">Cost Sheet Suite</CardTitle>
-          <CardDescription>Enter your authorized email address to continue</CardDescription>
+          <CardDescription>Enter your authorized email and password to continue</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4" data-testid="form-login">
@@ -62,6 +68,23 @@ export default function Login() {
               />
               <div className="text-xs text-muted-foreground mt-1">
                 Authorized users: {ALLOWED_USER_NAMES.join(" · ")}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                data-testid="input-password"
+                type="password"
+                placeholder="Your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="bg-background"
+                autoComplete="current-password"
+              />
+              <div className="text-xs text-muted-foreground mt-1">
+                First time here? Use the default password shared by your admin.
               </div>
             </div>
             <div className="space-y-2 pt-2">

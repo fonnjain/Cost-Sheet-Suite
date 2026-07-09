@@ -46,7 +46,7 @@ paths:
     post:
       operationId: login
       tags: [auth]
-      summary: Login with email (no password required)
+      summary: Login with email and password
       requestBody:
         required: true
         content:
@@ -98,6 +98,52 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      summary: Change the current user's password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordInput"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Invalid new password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Current password incorrect
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/activity:
+    get:
+      operationId: getUserActivity
+      tags: [users]
+      summary: Per-user quote activity log (admin only)
+      responses:
+        "200":
+          description: Quote activity grouped by user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserActivity"
 
   /users:
     get:
@@ -600,11 +646,25 @@ components:
 
     LoginInput:
       type: object
-      required: [email]
+      required: [email, password]
       properties:
         email:
           type: string
           format: email
+        password:
+          type: string
+          minLength: 1
+
+    ChangePasswordInput:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+          minLength: 1
+        newPassword:
+          type: string
+          minLength: 8
 
     AuthResponse:
       type: object
@@ -628,8 +688,40 @@ components:
           enum: [admin, user]
         isActive:
           type: boolean
+        mustChangePassword:
+          type: boolean
         createdAt:
           type: string
+
+    UserActivityQuote:
+      type: object
+      required: [id, customerName, projectRef, revision, structureType, createdAt]
+      properties:
+        id:
+          type: integer
+        customerName:
+          type: string
+        projectRef:
+          type: string
+        revision:
+          type: integer
+        structureType:
+          type: string
+        createdAt:
+          type: string
+
+    UserActivity:
+      type: object
+      required: [userName, quoteCount, quotes]
+      properties:
+        userName:
+          type: string
+        quoteCount:
+          type: integer
+        quotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserActivityQuote"
 
     UserInput:
       type: object

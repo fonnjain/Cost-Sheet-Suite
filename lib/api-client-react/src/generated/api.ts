@@ -21,6 +21,7 @@ import type {
 
 import type {
   AuthResponse,
+  ChangePasswordInput,
   Customer,
   CustomerInput,
   DailyLockInput,
@@ -43,6 +44,7 @@ import type {
   StructureCount,
   SuccessResponse,
   User,
+  UserActivity,
   UserInput,
   UserQuoteCount,
   UserUpdate,
@@ -147,7 +149,7 @@ export const getLoginUrl = () => {
 }
 
 /**
- * @summary Login with email (no password required)
+ * @summary Login with email and password
  */
 export const login = async (loginInput: LoginInput, options?: RequestInit): Promise<AuthResponse> => {
 
@@ -196,7 +198,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type LoginMutationError = ErrorType<ErrorResponse>
 
     /**
- * @summary Login with email (no password required)
+ * @summary Login with email and password
  */
 export const useLogin = <TError = ErrorType<ErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof login>>, TError,{data: BodyType<LoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -344,6 +346,154 @@ export function useGetMe<TData = Awaited<ReturnType<typeof getMe>>, TError = Err
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetMeQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getChangePasswordUrl = () => {
+
+
+
+
+  return `/api/auth/change-password`
+}
+
+/**
+ * @summary Change the current user's password
+ */
+export const changePassword = async (changePasswordInput: ChangePasswordInput, options?: RequestInit): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getChangePasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      changePasswordInput,)
+  }
+);}
+
+
+
+
+export const getChangePasswordMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext> => {
+
+const mutationKey = ['changePassword'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof changePassword>>, {data: BodyType<ChangePasswordInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  changePassword(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ChangePasswordMutationResult = NonNullable<Awaited<ReturnType<typeof changePassword>>>
+    export type ChangePasswordMutationBody = BodyType<ChangePasswordInput>
+    export type ChangePasswordMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Change the current user's password
+ */
+export const useChangePassword = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof changePassword>>,
+        TError,
+        {data: BodyType<ChangePasswordInput>},
+        TContext
+      > => {
+      return useMutation(getChangePasswordMutationOptions(options));
+    }
+
+export const getGetUserActivityUrl = () => {
+
+
+
+
+  return `/api/users/activity`
+}
+
+/**
+ * @summary Per-user quote activity log (admin only)
+ */
+export const getUserActivity = async ( options?: RequestInit): Promise<UserActivity[]> => {
+
+  return customFetch<UserActivity[]>(getGetUserActivityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUserActivityQueryKey = () => {
+    return [
+    `/api/users/activity`
+    ] as const;
+    }
+
+
+export const getGetUserActivityQueryOptions = <TData = Awaited<ReturnType<typeof getUserActivity>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUserActivityQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserActivity>>> = ({ signal }) => getUserActivity({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserActivity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUserActivityQueryResult = NonNullable<Awaited<ReturnType<typeof getUserActivity>>>
+export type GetUserActivityQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Per-user quote activity log (admin only)
+ */
+
+export function useGetUserActivity<TData = Awaited<ReturnType<typeof getUserActivity>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUserActivityQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

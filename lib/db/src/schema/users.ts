@@ -8,6 +8,9 @@ export const usersTable = pgTable("users", {
   name: text("name").notNull(),
   role: text("role").notNull().default("user"),
   isActive: boolean("is_active").notNull().default(true),
+  // null = user is still on the default password (Vtpl@2026); set once the user picks their own.
+  passwordHash: text("password_hash"),
+  mustChangePassword: boolean("must_change_password").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

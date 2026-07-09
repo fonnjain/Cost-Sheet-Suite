@@ -17,10 +17,14 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * @summary Login with email (no password required)
+ * @summary Login with email and password
  */
+
+
+
 export const LoginBody = zod.object({
-  "email": zod.string().email()
+  "email": zod.string().email(),
+  "password": zod.string().min(1)
 })
 
 export const LoginResponse = zod.object({
@@ -30,6 +34,7 @@ export const LoginResponse = zod.object({
   "name": zod.string(),
   "role": zod.enum(['admin', 'user']),
   "isActive": zod.boolean(),
+  "mustChangePassword": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 })
@@ -53,8 +58,46 @@ export const GetMeResponse = zod.object({
   "name": zod.string(),
   "role": zod.enum(['admin', 'user']),
   "isActive": zod.boolean(),
+  "mustChangePassword": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
+
+
+/**
+ * @summary Change the current user's password
+ */
+
+export const changePasswordBodyNewPasswordMin = 8;
+
+
+
+export const ChangePasswordBody = zod.object({
+  "currentPassword": zod.string().min(1),
+  "newPassword": zod.string().min(changePasswordBodyNewPasswordMin)
+})
+
+export const ChangePasswordResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string().nullish()
+})
+
+
+/**
+ * @summary Per-user quote activity log (admin only)
+ */
+export const GetUserActivityResponseItem = zod.object({
+  "userName": zod.string(),
+  "quoteCount": zod.number(),
+  "quotes": zod.array(zod.object({
+  "id": zod.number(),
+  "customerName": zod.string(),
+  "projectRef": zod.string(),
+  "revision": zod.number(),
+  "structureType": zod.string(),
+  "createdAt": zod.string()
+}))
+})
+export const GetUserActivityResponse = zod.array(GetUserActivityResponseItem)
 
 
 /**
@@ -66,6 +109,7 @@ export const ListUsersResponseItem = zod.object({
   "name": zod.string(),
   "role": zod.enum(['admin', 'user']),
   "isActive": zod.boolean(),
+  "mustChangePassword": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 export const ListUsersResponse = zod.array(ListUsersResponseItem)
@@ -100,6 +144,7 @@ export const UpdateUserResponse = zod.object({
   "name": zod.string(),
   "role": zod.enum(['admin', 'user']),
   "isActive": zod.boolean(),
+  "mustChangePassword": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
 

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 
 import Login from "./pages/login";
+import ChangePassword from "./pages/change-password";
 import Home from "./pages/home";
 import RmPrices from "./pages/rm-prices";
 import RmPriceList from "./pages/rm-price-list";
@@ -44,6 +45,7 @@ function Router() {
       <ScrollToTop />
       <Switch>
         <Route path="/login" component={Login} />
+        <Route path="/change-password" component={ChangePassword} />
         <Route path="/">
           <Layout>
             <Home />

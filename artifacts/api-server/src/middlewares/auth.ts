@@ -44,6 +44,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return;
   }
 
+  // Until the user replaces the default password, only allow the auth endpoints
+  // needed to complete the forced password change.
+  const allowedWhilePending = ["/auth/change-password", "/auth/logout", "/auth/me"];
+  if (user.mustChangePassword && !allowedWhilePending.includes(req.path)) {
+    res.status(403).json({ error: "Password change required" });
+    return;
+  }
+
   req.userId = user.id;
   req.userRole = user.role;
   req.userName = user.name;
