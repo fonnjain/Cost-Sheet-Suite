@@ -20,7 +20,9 @@ mode only (navy `#0e1f33` background, red `#e63329` accent), uses Sora for UI
 text and Space Mono for numbers, formats numbers in the Indian locale
 (`₹1,23,456`), and uses no emojis in the UI.
 
-Authentication is email-only against an allowlist — there are no passwords.
+Authentication is email + password against an allowlist. Every user starts on
+the default password (`Vtpl@2026`) and must set their own password on first
+logon before using the rest of the app.
 
 ## 2. Tech stack
 
@@ -93,7 +95,11 @@ in sync.
 Routing uses wouter, mounted under the Vite base path
 (`import.meta.env.BASE_URL`). See `src/App.tsx`. Routes:
 
-- `/login` — `src/pages/login.tsx`: email-only sign-in.
+- `/login` — `src/pages/login.tsx`: email + password sign-in; redirects to
+  `/change-password` when the user is still on the default password.
+- `/change-password` — `src/pages/change-password.tsx`: standalone page
+  (outside `Layout`) for the forced first-logon password change (current +
+  new + confirm, minimum 8 characters).
 - `/` — `src/pages/home.tsx`: landing / step navigation.
 - `/rm-prices` — `src/pages/rm-prices.tsx`: RM prices console (daily and
   twice-monthly panels, window lock, admin unlock).
@@ -208,8 +214,17 @@ via middleware unless noted.
 
 - `src/routes/health.ts` — `GET /api/healthz` (no auth).
 - `src/routes/auth.ts`:
-  - `POST /api/auth/login` (no auth) — email lookup against the allowlist;
-    issues a 30-day session token.
+  - `POST /api/auth/login` (no auth) — email lookup against the allowlist plus
+    password verification, then issues a 30-day session token. When
+    `users.passwordHash` is `NULL` the user is still on the default password
+    (`Vtpl@2026`, a constant in this file) and the password is compared against
+    that; otherwise it is checked with `bcrypt.compare`. Unknown email, inactive
+    user, and wrong password all return the same generic 401 message to prevent
+    account enumeration.
+  - `POST /api/auth/change-password` — validates the current password, requires
+    a new password of at least 8 characters that is not the default, stores a
+    bcrypt hash (cost 10), clears `mustChangePassword`, and revokes every other
+    session for the user (only the session making the change survives).
   - `POST /api/auth/logout` — deletes the session row matching the token
     resolved by the shared `extractToken` helper (`Authorization: Bearer
     <token>` first, `X-Session-Token` as a fallback). This is the same token the
@@ -217,7 +232,10 @@ via middleware unless noted.
     underlying session row immediately.
   - `GET /api/auth/me` — current user.
 - `src/routes/users.ts` (admin only) — `GET/POST /api/users`,
-  `PATCH/DELETE /api/users/:id`.
+  `PATCH/DELETE /api/users/:id`, and `GET /api/users/activity` — per-user quote
+  activity: all quotes grouped by `generatedByName`, sorted by count
+  descending, each with customer name, project ref, structure type, revision,
+  and date (rendered as the expandable "User Quote Activity" card on `/admin`).
 - `src/routes/customers.ts` — `GET/POST /api/customers`.
 - `src/routes/rm-prices.ts`:
   - `GET /api/rm-prices` — latest RM prices. `isWindowUnlocked` is the
@@ -278,7 +296,10 @@ via middleware unless noted.
 - `requireAuth` extracts the bearer token (from `Authorization: Bearer <token>`,
   with `X-Session-Token` as a fallback), validates a non-expired session,
   confirms the user exists and is active, and attaches `userId`, `userRole`, and
-  `userName` to the request.
+  `userName` to the request. While the user's `mustChangePassword` flag is set,
+  every endpoint except `/auth/change-password`, `/auth/logout`, and `/auth/me`
+  returns `403 Password change required`, so the forced first-logon password
+  change is enforced server-side, not just in the UI.
 - `requireAdmin` requires `userRole === "admin"` (returns `403` otherwise).
 
 ## 6. Database schema (`lib/db`)
@@ -287,7 +308,10 @@ The Drizzle client is created in `lib/db/src/index.ts` from a `pg` pool using
 `DATABASE_URL`; the schema is re-exported from `lib/db/src/schema/`. Tables:
 
 - `users` (`schema/users.ts`): `id` (serial PK), `email` (unique), `name`,
-  `role` (default `user`), `isActive` (default true), `createdAt`, `updatedAt`.
+  `role` (default `user`), `isActive` (default true), `passwordHash` (nullable;
+  `NULL` means the user is still on the default password), `mustChangePassword`
+  (default true — forces the first-logon password change), `createdAt`,
+  `updatedAt`.
 - `sessions` (`schema/sessions.ts`): `token` (PK), `userId`, `createdAt`,
   `expiresAt`. A session references a user by `userId`.
 - `customers` (`schema/customers.ts`): `id` (serial PK), `name` (unique),
@@ -367,9 +391,14 @@ typecheck:libs` before checking the leaf artifact packages.
 
 ## 8. Key architecture decisions
 
-- Email-only auth: no passwords. Login is an email lookup against an allowlist;
+- Email + password auth with a default-password bootstrap: login is an email
+  lookup against an allowlist plus a password check. New users start on the
+  default password `Vtpl@2026` (`passwordHash` `NULL` in the DB) and must set
+  their own bcrypt-hashed password on first logon; until then `requireAuth`
+  blocks everything except the change-password/logout/me endpoints. On success
   a random 30-day session token is issued, stored in the `sessions` table, sent
-  as `Authorization: Bearer <token>`, and persisted in `localStorage`.
+  as `Authorization: Bearer <token>`, and persisted in `localStorage`. Changing
+  the password revokes all other sessions for that user.
 - Twice-monthly RM window: the twice-monthly RM panel (plates, coils) is locked
   unless today is the 1st or 16th of the month, or an admin has explicitly
   unlocked it via the admin panel.
@@ -407,10 +436,14 @@ typecheck:libs` before checking the leaf artifact packages.
 ## 9. End-to-end request flow
 
 1. The user signs in at `/login`. `POST /api/auth/login` validates the email
-   against the allowlist and returns a user plus a session token.
+   against the allowlist plus the password (default `Vtpl@2026` until changed)
+   and returns a user plus a session token.
 2. The frontend stores the token in `localStorage` (`vt_session_token`) and
    registers the token getter so the custom fetch mutator attaches
-   `Authorization: Bearer <token>` to subsequent requests.
+   `Authorization: Bearer <token>` to subsequent requests. If the user is still
+   on the default password (`mustChangePassword`), both the login page and
+   `Layout` redirect to `/change-password`, and the server rejects all other
+   endpoints until the password is changed.
 3. Authenticated data fetches (RM prices, customers, quotes, dashboard) go
    through generated React Query hooks; `requireAuth` validates the session and
    attaches user context on the server.
@@ -424,7 +457,7 @@ typecheck:libs` before checking the leaf artifact packages.
 
 ```
 Browser (cost-sheet)                          API server                    PostgreSQL
-   │  POST /api/auth/login (email)  ─────────►  validate allowlist  ───────►  users
+   │  POST /api/auth/login (email+password) ─►  validate allowlist  ───────►  users
    │  ◄──── user + token ───────────────────   create session      ───────►  sessions
    │  store token in localStorage
    │  GET /api/rm-prices  (Bearer token) ────►  requireAuth ► query  ───────►  rm_prices
