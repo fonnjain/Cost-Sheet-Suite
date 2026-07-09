@@ -163,6 +163,19 @@ export const DeleteUserResponse = zod.object({
 
 
 /**
+ * @summary Reset a user's password to the default (admin only)
+ */
+export const ResetUserPasswordParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ResetUserPasswordResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string().nullish()
+})
+
+
+/**
  * @summary List all customers
  */
 export const ListCustomersResponseItem = zod.object({

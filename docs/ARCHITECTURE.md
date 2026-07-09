@@ -231,8 +231,11 @@ via middleware unless noted.
     generated client sends, so a Bearer-authenticated logout now revokes the
     underlying session row immediately.
   - `GET /api/auth/me` — current user.
-- `src/routes/users.ts` (admin only) — `GET/POST /api/users`,
-  `PATCH/DELETE /api/users/:id`, and `GET /api/users/activity` — per-user quote
+- `src/routes/users.ts` (admin only) — `GET/POST /api/users` (create rejects
+  duplicate emails with 409; new users start on the default password),
+  `PATCH/DELETE /api/users/:id`, `POST /api/users/:id/reset-password` (sets
+  `passwordHash` back to `NULL` and `mustChangePassword` to true, and revokes
+  all of that user's sessions), and `GET /api/users/activity` — per-user quote
   activity: all quotes grouped by `generatedByName`, sorted by count
   descending, each with customer name, project ref, structure type, revision,
   and date (rendered as the expandable "User Quote Activity" card on `/admin`).

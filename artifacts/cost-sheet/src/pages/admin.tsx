@@ -1,14 +1,15 @@
 import { Fragment, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useListUsers, useUpdateUser, useDeleteUser, useUnlockTwiceMonthly, useToggleDailyLock, useGetRmPricesHistory, useGetRmPrices, useGetUserActivity, getGetRmPricesQueryKey } from "@workspace/api-client-react";
+import { useListUsers, useCreateUser, useUpdateUser, useDeleteUser, useResetUserPassword, useUnlockTwiceMonthly, useToggleDailyLock, useGetRmPricesHistory, useGetRmPrices, useGetUserActivity, useGetMe, getGetRmPricesQueryKey, getListUsersQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Unlock, Lock, Shield, Trash2, UserCog, FileText, ChevronDown, ChevronRight } from "lucide-react";
+import { Unlock, Lock, Shield, Trash2, UserCog, FileText, ChevronDown, ChevronRight, UserPlus, KeyRound } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Admin() {
@@ -16,9 +17,15 @@ export default function Admin() {
   const { data: history, isLoading: loadingHistory } = useGetRmPricesHistory();
   const { data: activity, isLoading: loadingActivity } = useGetUserActivity();
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newRole, setNewRole] = useState<'admin' | 'user'>("user");
   const { data: rmPrices } = useGetRmPrices();
+  const { data: me } = useGetMe();
+  const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
+  const resetPassword = useResetUserPassword();
   const unlockWindow = useUnlockTwiceMonthly();
   const toggleDailyLock = useToggleDailyLock();
   const queryClient = useQueryClient();
@@ -29,9 +36,36 @@ export default function Admin() {
   const isScheduleOpen = isWindowOpen && !isOverrideOn;
   const isDailyLocked = !!rmPrices?.isDailyLocked;
 
+  const invalidateUsers = () =>
+    queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
+
+  const handleAddUser = async () => {
+    const name = newName.trim();
+    const email = newEmail.trim().toLowerCase();
+    if (!name || !email) {
+      toast({ variant: "destructive", title: "Error", description: "Name and email are required" });
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({ variant: "destructive", title: "Error", description: "Enter a valid email address" });
+      return;
+    }
+    try {
+      await createUser.mutateAsync({ data: { name, email, role: newRole } });
+      await invalidateUsers();
+      setNewName("");
+      setNewEmail("");
+      setNewRole("user");
+      toast({ title: "User added", description: `${name} can now log in with the default password.` });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Error", description: e.message });
+    }
+  };
+
   const handleToggleActive = async (id: number, isActive: boolean) => {
     try {
       await updateUser.mutateAsync({ id, data: { isActive } });
+      await invalidateUsers();
       toast({ title: "Updated", description: "User status updated" });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
@@ -41,6 +75,7 @@ export default function Admin() {
   const handleRoleChange = async (id: number, role: 'admin' | 'user') => {
     try {
       await updateUser.mutateAsync({ id, data: { role } });
+      await invalidateUsers();
       toast({ title: "Updated", description: "User role updated" });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
@@ -51,7 +86,23 @@ export default function Admin() {
     if (!confirm("Are you sure you want to delete this user?")) return;
     try {
       await deleteUser.mutateAsync({ id });
+      await invalidateUsers();
       toast({ title: "Deleted", description: "User deleted" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Error", description: e.message });
+    }
+  };
+
+  const handleResetPassword = async (id: number, name: string) => {
+    const isSelf = me?.id === id;
+    const message = isSelf
+      ? "Reset YOUR OWN password to the default? You will be logged out immediately and must log back in with the default password, then set a new one."
+      : `Reset ${name}'s password to the default? They will be logged out and must set a new password on next login.`;
+    if (!confirm(message)) return;
+    try {
+      await resetPassword.mutateAsync({ id });
+      await invalidateUsers();
+      toast({ title: "Password reset", description: `${name} is back on the default password.` });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     }
@@ -106,6 +157,47 @@ export default function Admin() {
             <CardDescription>Control who has access to the suite and their roles.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
+            <div className="p-4 border-b border-border/50 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <UserPlus className="h-4 w-4 text-primary" />
+                Add User
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[1fr_1.4fr_auto_auto]">
+                <Input
+                  placeholder="Name"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  data-testid="input-new-user-name"
+                />
+                <Input
+                  type="email"
+                  placeholder="email@vijaytransmission.com"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  data-testid="input-new-user-email"
+                />
+                <Select value={newRole} onValueChange={(v: 'admin' | 'user') => setNewRole(v)}>
+                  <SelectTrigger className="w-full sm:w-[110px]" data-testid="select-new-user-role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent side="bottom">
+                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleAddUser}
+                  disabled={createUser.isPending}
+                  className="font-bold bg-accent hover:bg-accent/90 text-accent-foreground"
+                  data-testid="button-add-user"
+                >
+                  {createUser.isPending ? "Adding..." : "Add"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                New users log in with the default password and must change it on first login.
+              </p>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -140,8 +232,19 @@ export default function Admin() {
                         onCheckedChange={(v) => handleToggleActive(u.id, v)} 
                       />
                     </TableCell>
-                    <TableCell className="text-right pr-4">
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id)} className="text-destructive hover:bg-destructive/10">
+                    <TableCell className="text-right pr-4 whitespace-nowrap">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleResetPassword(u.id, u.name)}
+                        disabled={resetPassword.isPending}
+                        className="text-muted-foreground hover:bg-accent/10 hover:text-accent"
+                        title="Reset password to default"
+                        data-testid={`button-reset-password-${u.id}`}
+                      >
+                        <KeyRound className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id)} className="text-destructive hover:bg-destructive/10" data-testid={`button-delete-user-${u.id}`}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>

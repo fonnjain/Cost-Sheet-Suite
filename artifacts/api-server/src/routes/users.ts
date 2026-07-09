@@ -1,13 +1,14 @@
 import { Router } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { usersTable, quotesTable } from "@workspace/db/schema";
+import { usersTable, quotesTable, sessionsTable } from "@workspace/db/schema";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import {
   CreateUserBody,
   UpdateUserBody,
   UpdateUserParams,
   DeleteUserParams,
+  ResetUserPasswordParams,
   GetUserActivityResponse,
 } from "@workspace/api-zod";
 
@@ -79,10 +80,26 @@ router.post("/users", requireAuth, requireAdmin, async (req, res): Promise<void>
     return;
   }
 
-  const [user] = await db
-    .insert(usersTable)
-    .values({ ...parsed.data, email: parsed.data.email.toLowerCase().trim() })
-    .returning();
+  const email = parsed.data.email.toLowerCase().trim();
+
+  let user;
+  try {
+    [user] = await db
+      .insert(usersTable)
+      .values({ ...parsed.data, email })
+      .returning();
+  } catch (err: unknown) {
+    // Unique-constraint violation on email → 409 (DB is the final authority).
+    // Drizzle wraps the pg error, so check both the error and its cause.
+    const pgCode = (e: unknown): string | undefined =>
+      e && typeof e === "object" && "code" in e ? (e as { code?: string }).code : undefined;
+    const cause = err && typeof err === "object" && "cause" in err ? (err as { cause?: unknown }).cause : undefined;
+    if (pgCode(err) === "23505" || pgCode(cause) === "23505") {
+      res.status(409).json({ error: "A user with this email already exists." });
+      return;
+    }
+    throw err;
+  }
 
   res.status(201).json({
     id: user.id,
@@ -125,6 +142,30 @@ router.patch("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<
     isActive: user.isActive,
     createdAt: user.createdAt?.toISOString(),
   });
+});
+
+router.post("/users/:id/reset-password", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  const params = ResetUserPasswordParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [user] = await db
+    .update(usersTable)
+    .set({ passwordHash: null, mustChangePassword: true })
+    .where(eq(usersTable.id, params.data.id))
+    .returning();
+
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  // Revoke all sessions so the old password can't keep an active session alive.
+  await db.delete(sessionsTable).where(eq(sessionsTable.userId, user.id));
+
+  res.json({ success: true });
 });
 
 router.delete("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
