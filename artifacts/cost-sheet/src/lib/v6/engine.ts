@@ -651,7 +651,10 @@ export function buildDefaultInputs(spec: any, rm: RMData): Record<string, any> {
   // defaults omit them (e.g. Fasteners has no scrap/recovery default).
   if (inputs.scrap_pct == null) inputs.scrap_pct = 0.04;
   if (inputs.recovery_pct == null) inputs.recovery_pct = -0.4;
-  inputs.zinc_price = d.zinc_price || rm.zincPrice || 285000;
+  // `??` (not `||`): sheets like Buyout carry an explicit zinc_price of 0 in the
+  // source workbook (no galvanizing in the cost build-up). Falling back to the
+  // live zinc console price for an explicit 0 would silently add a zinc line.
+  inputs.zinc_price = d.zinc_price ?? (rm.zincPrice || 285000);
   return inputs;
 }
 

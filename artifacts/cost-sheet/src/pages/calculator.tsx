@@ -46,8 +46,8 @@ const STRUCTURE_FAMILIES: { group: string; items: string[] }[] = [
     items: ["out source < 150 mt "],
   },
   {
-    group: "RSJ Poles",
-    items: ["RSJ Pole - Base Plate "],
+    group: "Poles",
+    items: ["A  H-Pole", "RSJ Pole - Base Plate "],
   },
   {
     group: "Fasteners & Foundation Bolts",
@@ -56,6 +56,18 @@ const STRUCTURE_FAMILIES: { group: string; items: string[] }[] = [
   {
     group: "Railways",
     items: ["RLY-Mast", "RLY - Portal", "Rly - SPS", "Rly - Sp. Masts ", "RLY-Drop Tubes", "RLY-BFBRSJ"],
+  },
+  {
+    group: "NTLT",
+    items: ["NTLT-MS", "NTLT-Earthing"],
+  },
+  {
+    group: "Rural",
+    items: ["Rural (Welded & Clamps)", "Rural (Non-Welded)"],
+  },
+  {
+    group: "Buyout",
+    items: ["Buyout"],
   },
 ];
 
@@ -319,7 +331,7 @@ export default function Calculator() {
         : isRailc
           ? !!inputs.section
           : isManual
-            ? Number(inputs.manualRM) > 0
+            ? Number.isFinite(Number(inputs.manualRM))
             : false);
 
   const results = useMemo(() => {

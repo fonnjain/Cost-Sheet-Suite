@@ -5,3 +5,4 @@
 - [Quote vendor-approval invariant](quote-approval.md) — at most one approved revision per customer+project; approve in one DB transaction; validate UI selection against loaded project.
 - [RQ cache invalidation in cost-sheet](rq-cache-invalidation.md) — mutations MUST invalidateQueries or UI shows stale state (30s staleTime).
 - [RM ratio row-sum validation](rm-ratio-editor-row-validation.md) — "sum to 100%" APIs must require the full key set or partial payloads bypass it.
+- [v6 workbook parity](v6-workbook-parity.md) — verify vs blank-template state (kv unselected, micron 0); defaults with explicit 0 need `??` not `||` in prefill chains.
