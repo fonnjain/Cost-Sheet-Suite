@@ -118,9 +118,11 @@ Routing uses wouter, mounted under the Vite base path
 - `/dashboard` — `src/pages/dashboard.tsx`: KPIs and charts.
 - `/review` — `src/pages/review.tsx`: compare all revisions for a
   client + project; approve a revision; legacy-quote messaging.
-- `/admin` — `src/pages/admin.tsx`: user management, twice-monthly window
-  unlock (admin only), and the RM Ratio Editor (`src/components/rm-ratio-editor.tsx`,
-  admin only) for the 11 structures with voltage-weighted RM price ratios.
+- `/admin` — `src/pages/admin.tsx`: user management and twice-monthly window
+  unlock (admin only).
+- `/rm-ratios` — `src/pages/rm-ratios.tsx` (admin only): hosts the RM Ratio
+  Editor (`src/components/rm-ratio-editor.tsx`) for the 11 structures with
+  voltage-weighted RM price ratios.
 - Fallback — `src/pages/not-found.tsx`.
 
 All non-login routes render inside `src/components/layout.tsx`.
