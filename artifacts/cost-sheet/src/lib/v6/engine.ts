@@ -189,8 +189,8 @@ export const DEFAULT_OFFSETS: Record<string, number> = {
   J9: 2250,
   K9: 2750,
   L9: 1450,
-  D18: 5500,
-  E18: 4000,
+  D18: 7000,
+  E18: 5500,
 };
 
 /**
@@ -254,7 +254,7 @@ export function buildRMData(overrides: Overrides = {}): RMData {
     return result;
   }
 
-  const angles = readBlock(7, 8, [9, 16], ["D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O"]);
+  const angles = readBlock(7, 8, [9, 16], ["D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"]);
   const flats = readBlock(22, 23, [24, 30], ["D", "E", "F", "G", "H", "I", "J"]);
   const rounds = readBlock(36, 37, [38, 40], ["D", "E", "F", "G", "H", "I"]);
   const rsj = readBlock(47, 48, [49, 75], ["D", "E", "F", "G", "H", "I", "J", "K"]);
@@ -337,7 +337,7 @@ export function buildRMPriceListView(overrides: Overrides = {}): RMPriceListView
   }
 
   const blocks: RMPriceListBlock[] = [
-    readDisplayBlock("angles", "Angles", 7, 8, [9, 16], ["D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O"]),
+    readDisplayBlock("angles", "Angles", 7, 8, [9, 16], ["D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"]),
     readDisplayBlock("flats", "MS Flats", 22, 23, [24, 30], ["D", "E", "F", "G", "H", "I", "J"]),
     readDisplayBlock("rounds", "MS Rounds", 36, 37, [38, 40], ["D", "E", "F", "G", "H", "I"]),
     readDisplayBlock("rsj", "RSJ, WPB, Channels & Beams", 47, 48, [49, 75], ["D", "E", "F", "G", "H", "I", "J", "K"]),

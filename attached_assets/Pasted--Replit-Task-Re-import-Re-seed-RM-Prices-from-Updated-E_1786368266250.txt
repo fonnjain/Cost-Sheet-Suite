@@ -1,0 +1,46 @@
+# Replit Task — Re-import / Re-seed RM Prices from Updated Excel
+
+**Reference file (attached):** `RM_Price___Gauge_List.xlsx` (two worksheets: `Billet and Gauge` and `RM Price List`)
+
+## Goal
+Refresh the app's Raw Material price data from the attached, updated RM Excel. This is a **data update only** — do **not** change any calculation logic, engine, schema of the cost sheets, ratio tables, or template defaults. Overwrite the current RM price data (both worksheets) with the values from this file so all **new** quotes use the new prices.
+
+## Critical rules
+- **Use the app's existing RM import/parsing logic** (the same parser already built for the "Import RM Excel" feature). Do not write a new parser or re-key values by hand.
+- **Existing saved quotes must NOT be recomputed.** They stay as historical records at their original prices. Only new quotes use the refreshed prices.
+- **Do not touch** the cost engine, per-structure defaults, RM voltage×category ratio editor, or the twice-monthly/daily classification logic. Only the price *values* and the supplier *column set* change.
+- Preserve the existing field classifications (Daily / Twice-Monthly / Auto / Fixed) and the base+offset auto relationships. If a base price changes, the auto "base + offset" values must recompute from the new base as before.
+- After import, update the RM "as of" date shown in the app from this file's date stamp.
+
+## What changed in this file (so you can verify the import landed correctly)
+
+### Billet and Gauge (raw inputs)
+- **Zinc (HZL)**: 384,400 → **409,500** (+25,100) — this is intentional, confirmed.
+- **SAIL billets** (SAIL_Dgp/Kol/Ryp/Ngp/Rour): each **−2,500**. Base SAIL_Dgp: 47,000 → **44,500**.
+- **HR Plate**: Raipur 57,500→57,000; Rourkela 58,000→57,000; Raigarh 60,000→59,000.
+- **HR Coil**: Raipur 56,575→56,075 (others unchanged).
+- **Wire Rod** base (Ludhiana_Coml): 57,000 → **54,000** (−3,000). The RINL/JSW auto values must recompute off the new base.
+
+### RM Price List — Angles block (supplier column set changed)
+- **ADDED suppliers**: `VANDANA (NPG)`, `NSPL (PG)`, `SREL (PG)`.
+- **REMOVED suppliers**: `MAHAMAYA (NPG)`, `SREL (PG/NTPC)`.
+- **KIPL (PG)** and **SBAL (PG)**: all sections **−2,500**.
+- Net angle supplier columns after import (in order): BALAJEE (NPG), JAI AMBE (NPG), NSPL (NPG), **VANDANA (NPG)**, SREL (PG), KIPL (PG), SBAL (PG), NSPL (PG), NSPL (TESTED), MADHUR (TESTED), SREL (MAIN/BSEN), BALAJEE (MAIN), JSPL (PG/NTPC).
+
+### RM Price List — other blocks
+Prices moved in several blocks (Flats, Rounds, RSJ/Channels/Beams, Plate, **Hardware ~36 changes**). Import them all from the file verbatim. The JSPL / 200 mm cell (previously an error in an earlier file) is now a clean value (66,100) — no error cells remain in this file.
+
+## Make × Grade lookup — important
+The angle supplier columns feed the Make × Grade price lookup. After importing the new columns, confirm each Make tag maps to the correct supplier column so the calculator still picks the right price. In particular the SREL re-categorisation (now `(PG)`, not `(PG/NTPC)`) and the new VANDANA/NSPL columns must be wired into the Make lookup, not just displayed.
+
+## The read-only "RM Price List" view tab
+Update the read-only RM Price List display tab so it reflects the new supplier columns (including VANDANA) and the new prices.
+
+## Acceptance checks (report back)
+1. Confirm zinc = 409,500 and the RM "as of" date updated.
+2. Confirm the Angles block now shows VANDANA (NPG), NSPL (PG), SREL (PG); and MAHAMAYA (NPG) / SREL (PG/NTPC) are gone.
+3. Confirm SAIL_Dgp = 44,500 and the SAIL_* auto columns recomputed; Ludhiana wire base = 54,000 and RINL/JSW auto values recomputed.
+4. Confirm no error cells were imported (this file is clean).
+5. Confirm an existing saved quote is unchanged (historical), and a NEW quote on the same structure now reflects the new prices.
+6. Confirm the Make × Grade lookup still resolves correctly for angles after the column changes.
+7. Do not change any formula to force numbers — if something looks off, report it; do not silently adjust.

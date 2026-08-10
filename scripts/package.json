@@ -6,13 +6,18 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "seed": "tsx ./src/seed.ts",
+    "update-rm-prices": "tsx ./src/update-rm-prices.ts",
+    "cleanup-rm-prices": "tsx ./src/cleanup-rm-prices.ts",
+    "gen-data": "tsx ./src/gen-data.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@workspace/db": "workspace:*"
+    "@workspace/db": "workspace:*",
+    "exceljs": "^4.4.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "drizzle-orm": "catalog:",
     "tsx": "catalog:"
   }
 }
