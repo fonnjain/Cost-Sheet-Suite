@@ -8,6 +8,7 @@ import {
   useCreateQuote,
   useGetQuotesByProject,
   useGetProjectsByCustomer,
+  useGetTemplateDefaults,
   getListCustomersQueryKey,
   getGetProjectsByCustomerQueryKey,
 } from "@workspace/api-client-react";
@@ -25,7 +26,7 @@ import { formatINR } from "@/lib/costCalculator";
 import { buildRMData, calculateCostSheet, buildDefaultInputs, computeAutoOverrides, getDistinctMakes, MASTER_SPECS } from "@/lib/v6/engine";
 import { useGetRmOffsets, useGetRmRatios } from "@workspace/api-client-react";
 import { toLegacyShape } from "@/lib/v6/legacy";
-import { ChevronRight, ChevronLeft, Check, Plus, AlertCircle } from "lucide-react";
+import { ChevronRight, ChevronLeft, Check, Plus, AlertCircle, Percent, IndianRupee } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SearchableSelect } from "@/components/searchable-select";
 
@@ -128,6 +129,7 @@ export default function Calculator() {
   const { data: rmPrices } = useGetRmPrices();
   const { data: rmOffsets } = useGetRmOffsets();
   const { data: rmRatios } = useGetRmRatios();
+  const { data: templateDefaults } = useGetTemplateDefaults();
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState(1);
@@ -199,6 +201,19 @@ export default function Calculator() {
     return { ...spec, ratios: { ...spec.ratios, kv_options: overriddenKvOptions } };
   }, [spec, isKvSchema, structureType, rmRatios]);
 
+  // Admin-editable template defaults: build a flat map of {fieldKey → value} for
+  // the current structure, to overlay onto spec defaults in buildDefaultInputs.
+  const structureTemplateOverrides = useMemo<Record<string, number>>(() => {
+    if (!structureType || !templateDefaults || templateDefaults.length === 0) return {};
+    const out: Record<string, number> = {};
+    for (const row of templateDefaults) {
+      if (row.structureName === structureType) {
+        out[row.fieldKey] = row.fieldValue;
+      }
+    }
+    return out;
+  }, [structureType, templateDefaults]);
+
   // Railways (channel) Make options: the v6 "full supplier list" (default CORE),
   // de-duplicated case-insensitively so the internal "TESTED"/"Tested" pair shows
   // once. Each option maps to a real supplier price column (engine matches tags).
@@ -221,11 +236,23 @@ export default function Calculator() {
   // Track which spec the inputs were built for, so we rebuild defaults on change.
   const [inputsForSpec, setInputsForSpec] = useState<string>("");
 
+  // Step 4 Discount State
+  // mode: 'pct' = percentage of quote price; 'abs' = absolute ₹/MT
+  const [discountMode, setDiscountMode] = useState<'pct' | 'abs'>('pct');
+  const [discountValue, setDiscountValue] = useState<string>('');
+
+  // Reset discount when structure or margin changes (moving between builds)
+  useEffect(() => {
+    setDiscountValue('');
+    setDiscountMode('pct');
+  }, [structureType, selectedMarginIdx]);
+
   // Build default inputs whenever the chosen structure changes.
+  // Template defaults (from DB) are overlaid on top of the hardcoded spec defaults.
   useEffect(() => {
     if (!spec || !structureType) return;
     if (inputsForSpec === structureType) return;
-    const defaults = buildDefaultInputs(spec, rm);
+    const defaults = buildDefaultInputs(spec, rm, structureTemplateOverrides);
     const sch = spec.schema;
     const kvLike = sch === "tlt5" || sch === "subp" || sch === "rsj";
     // kvOption holds the primary selection seeded from a prior revision; map it
@@ -240,7 +267,7 @@ export default function Calculator() {
     setKvOption(sel ?? "");
     setSelectedMarginIdx(0);
     setInputsForSpec(structureType);
-  }, [spec, structureType, rm, kvOption, inputsForSpec]);
+  }, [spec, structureType, rm, kvOption, inputsForSpec, structureTemplateOverrides]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -345,6 +372,20 @@ export default function Calculator() {
 
   const quotePrice = results?.margins[selectedMarginIdx]?.quote ?? 0;
 
+  // Compute discount amount and net price for Step 4
+  const discountAmount = useMemo(() => {
+    const val = parseFloat(discountValue) || 0;
+    if (val <= 0 || quotePrice <= 0) return 0;
+    if (discountMode === 'pct') {
+      return quotePrice * Math.min(val, 100) / 100;
+    }
+    return Math.min(val, quotePrice);
+  }, [discountMode, discountValue, quotePrice]);
+
+  const netQuotePrice = quotePrice - discountAmount;
+
+  const hasDiscount = discountAmount > 0;
+
   const handleSaveQuote = async () => {
     if (!spec || !results) return;
     try {
@@ -367,7 +408,13 @@ export default function Calculator() {
           costBreakdown: legacyCostBreakdown,
           generatedByName: user?.name || "Unknown",
           notes,
-        },
+          // Discount fields (only passed when a discount was entered)
+          ...(hasDiscount ? {
+            discountMode,
+            discountValue: discountMode === 'pct' ? (parseFloat(discountValue) || 0) / 100 : parseFloat(discountValue) || 0,
+            netQuotePricePerMt: netQuotePrice,
+          } : {}),
+        } as any,
       });
       toast({ title: "Success", description: "Quote saved. Opening Dashboard…" });
       setLocation(`/dashboard?id=${saved.id}`);
@@ -948,16 +995,92 @@ export default function Calculator() {
               </div>
 
               <div className="space-y-6 flex flex-col justify-start">
+                {/* Final Quote Price card */}
                 <Card className="border-primary/30 bg-primary/5">
                   <CardHeader className="text-center pb-2">
-                    <CardTitle className="text-sm font-bold text-primary uppercase tracking-wider">Final Quote Price</CardTitle>
+                    <CardTitle className="text-sm font-bold text-primary uppercase tracking-wider">Quote Price</CardTitle>
                     <CardDescription>Based on {((results.margins[selectedMarginIdx]?.pct ?? 0) * 100).toFixed(1)}% margin</CardDescription>
                   </CardHeader>
-                  <CardContent className="text-center pb-6">
-                    <div className="text-5xl font-mono font-bold text-primary tracking-tighter" data-testid="text-quote-price">
-                      {formatINR(quotePrice)}
+                  <CardContent className="pb-4">
+                    <div className="text-center">
+                      <div className="text-5xl font-mono font-bold text-primary tracking-tighter" data-testid="text-quote-price">
+                        {formatINR(quotePrice)}
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-2 font-mono">per Metric Ton</div>
                     </div>
-                    <div className="text-sm text-muted-foreground mt-2 font-mono">per Metric Ton</div>
+
+                    {/* Additional Discount Section */}
+                    <div className="mt-5 border-t border-primary/20 pt-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Additional Discount</span>
+                        {/* Mode toggle */}
+                        <div className="flex rounded-md overflow-hidden border border-border/60 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => { setDiscountMode('pct'); setDiscountValue(''); }}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 font-bold transition-colors ${discountMode === 'pct' ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'}`}
+                            data-testid="btn-discount-pct"
+                          >
+                            <Percent className="h-3 w-3" /> %
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setDiscountMode('abs'); setDiscountValue(''); }}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 font-bold transition-colors ${discountMode === 'abs' ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'}`}
+                            data-testid="btn-discount-abs"
+                          >
+                            <IndianRupee className="h-3 w-3" /> ₹/MT
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 items-center">
+                        <div className="relative flex-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            step={discountMode === 'pct' ? "0.01" : "1"}
+                            max={discountMode === 'pct' ? "100" : undefined}
+                            value={discountValue}
+                            onChange={(e) => setDiscountValue(e.target.value)}
+                            placeholder={discountMode === 'pct' ? "e.g. 2.5" : "e.g. 1500"}
+                            className="font-mono pr-14 bg-background/60"
+                            data-testid="input-discount-value"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono">
+                            {discountMode === 'pct' ? '%' : '₹/MT'}
+                          </span>
+                        </div>
+                        {discountValue && (
+                          <button
+                            type="button"
+                            onClick={() => setDiscountValue('')}
+                            className="text-xs text-muted-foreground hover:text-foreground px-2"
+                            data-testid="btn-discount-clear"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+
+                      {hasDiscount && (
+                        <div className="space-y-1.5 rounded-lg bg-card/60 p-3 text-sm">
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>Quote Total</span>
+                            <span className="font-mono">{formatINR(quotePrice)}</span>
+                          </div>
+                          <div className="flex justify-between text-primary">
+                            <span>− Discount</span>
+                            <span className="font-mono">− {formatINR(discountAmount)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold border-t border-border/50 pt-1.5 text-emerald-400">
+                            <span>Net Quote</span>
+                            <span className="font-mono text-lg" data-testid="text-net-quote-price">{formatINR(netQuotePrice)}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground text-right font-mono">per Metric Ton</div>
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                   <CardFooter>
                     <Button size="lg" className="w-full font-bold text-lg h-14" onClick={handleSaveQuote} disabled={createQuote.isPending} data-testid="button-save-quote">

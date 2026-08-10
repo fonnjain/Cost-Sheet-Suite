@@ -24,6 +24,12 @@ export const quotesTable = pgTable("quotes", {
   // Quotes computed by the pre-reconciliation engine are flagged legacy and shown
   // read-only with a "computed on previous logic" note. New quotes default to false.
   legacy: boolean("legacy").notNull().default(false),
+  // Additional discount applied by the salesperson after margin (does not change underlying cost).
+  // discountMode: 'pct' (fractional, e.g. 0.05 = 5%) or 'abs' (absolute ₹/MT).
+  // netQuotePricePerMt = quotePricePerMt minus the discount. NULL when no discount applied.
+  discountMode: text("discount_mode"),
+  discountValue: numeric("discount_value", { precision: 12, scale: 4 }),
+  netQuotePricePerMt: numeric("net_quote_price_per_mt", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

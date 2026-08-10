@@ -26,4 +26,10 @@ export interface QuoteInput {
   generatedByName: string;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  discountMode?: string | null;
+  /** @nullable */
+  discountValue?: number | null;
+  /** @nullable */
+  netQuotePricePerMt?: number | null;
 }

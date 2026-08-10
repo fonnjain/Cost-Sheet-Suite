@@ -606,8 +606,13 @@ export function calculateCostSheet(rm: RMData, spec: any, i: any): CostResults {
 }
 
 // ---------- Input form helpers (drives the React calculator) ----------
-export function buildDefaultInputs(spec: any, rm: RMData): Record<string, any> {
-  const d = spec.defaults || {};
+//
+// dbOverrides: optional map of spec-key → number from the admin-editable
+// template_defaults table. Merged BEFORE schema-specific processing so that
+// all downstream mappings (e.g. zinc_micron → zincMicron) still apply.
+// Existing quotes are never recomputed — this only affects new defaults.
+export function buildDefaultInputs(spec: any, rm: RMData, dbOverrides?: Record<string, number>): Record<string, any> {
+  const d = { ...(spec.defaults || {}), ...(dbOverrides ?? {}) };
   const inputs: Record<string, any> = JSON.parse(JSON.stringify(d));
   const margins: number[] = d.margins || [0.03, 0.05, 0.08, 0.1];
   for (let idx = 0; idx < 4; idx++) inputs["margin_" + idx] = margins[idx] != null ? margins[idx] : 0;

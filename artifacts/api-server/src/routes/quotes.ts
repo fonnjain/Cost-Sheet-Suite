@@ -35,6 +35,9 @@ function formatQuote(q: typeof quotesTable.$inferSelect) {
     approvedAt: q.approvedAt?.toISOString() ?? null,
     approvedByName: q.approvedByName ?? null,
     legacy: q.legacy,
+    discountMode: q.discountMode ?? null,
+    discountValue: q.discountValue != null ? Number(q.discountValue) : null,
+    netQuotePricePerMt: q.netQuotePricePerMt != null ? Number(q.netQuotePricePerMt) : null,
     createdAt: q.createdAt?.toISOString(),
   };
 }
@@ -94,6 +97,13 @@ router.post("/quotes", requireAuth, async (req, res): Promise<void> => {
       generatedByName: parsed.data.generatedByName,
       notes: parsed.data.notes ?? null,
       revision: nextRevision,
+      discountMode: (parsed.data as Record<string, unknown>).discountMode as string | undefined ?? null,
+      discountValue: (parsed.data as Record<string, unknown>).discountValue != null
+        ? String((parsed.data as Record<string, unknown>).discountValue)
+        : null,
+      netQuotePricePerMt: (parsed.data as Record<string, unknown>).netQuotePricePerMt != null
+        ? String((parsed.data as Record<string, unknown>).netQuotePricePerMt)
+        : null,
     })
     .returning();
 

@@ -450,6 +450,81 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /template-defaults:
+    get:
+      operationId: getTemplateDefaults
+      tags: [admin]
+      summary: Get all admin-saved template default overrides (admin only)
+      responses:
+        "200":
+          description: All stored overrides
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TemplateDefault"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /template-defaults/{structureName}:
+    post:
+      operationId: saveTemplateDefaults
+      tags: [admin]
+      summary: Save template default overrides for one structure (admin only)
+      parameters:
+        - name: structureName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateDefaultsInput"
+      responses:
+        "200":
+          description: Saved overrides for this structure
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TemplateDefault"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /template-defaults/history:
+    get:
+      operationId: getTemplateDefaultsHistory
+      tags: [admin]
+      summary: Get change history for template defaults (admin only)
+      responses:
+        "200":
+          description: Recent changes, most recent first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TemplateDefaultsHistoryEntry"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /quotes:
     get:
       operationId: listQuotes
@@ -903,6 +978,49 @@ components:
           type: boolean
           description: True to lock RM file inputs for today, false to unlock.
 
+    TemplateDefault:
+      type: object
+      required: [structureName, fieldKey, fieldValue, updatedByName, updatedAt]
+      properties:
+        structureName:
+          type: string
+        fieldKey:
+          type: string
+        fieldValue:
+          type: number
+        updatedByName:
+          type: string
+        updatedAt:
+          type: string
+
+    TemplateDefaultsInput:
+      type: object
+      required: [fields]
+      properties:
+        fields:
+          type: object
+          description: Map of field_key -> value for this structure
+          additionalProperties:
+            type: number
+
+    TemplateDefaultsHistoryEntry:
+      type: object
+      required: [structureName, fieldKey, newValue, changedByName, changedAt]
+      properties:
+        structureName:
+          type: string
+        fieldKey:
+          type: string
+        oldValue:
+          type: number
+          nullable: true
+        newValue:
+          type: number
+        changedByName:
+          type: string
+        changedAt:
+          type: string
+
     Quote:
       type: object
       required: [id, customerId, customerName, projectRef, revision, structureType, kvOption, quotePricePerMt, totalCost, inputs, costBreakdown, generatedByName, legacy, createdAt]
@@ -949,6 +1067,15 @@ components:
         legacy:
           type: boolean
           description: True for quotes computed by the pre-reconciliation engine; shown read-only
+        discountMode:
+          type: ["string", "null"]
+          description: "'pct' or 'abs' — mode of the additional discount applied by salesperson"
+        discountValue:
+          type: ["number", "null"]
+          description: "Discount magnitude: fraction for 'pct' (e.g. 0.05 = 5%) or absolute ₹/MT for 'abs'"
+        netQuotePricePerMt:
+          type: ["number", "null"]
+          description: Quote price after additional discount. NULL when no discount applied.
         createdAt:
           type: string
 
@@ -982,6 +1109,12 @@ components:
           type: string
         notes:
           type: ["string", "null"]
+        discountMode:
+          type: ["string", "null"]
+        discountValue:
+          type: ["number", "null"]
+        netQuotePricePerMt:
+          type: ["number", "null"]
 
     DashboardSummary:
       type: object

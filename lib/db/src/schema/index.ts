@@ -7,3 +7,5 @@ export * from "./rm_ratios";
 export * from "./rm_ratio_history";
 export * from "./quotes";
 export * from "./sessions";
+export * from "./template_defaults";
+export * from "./template_defaults_history";

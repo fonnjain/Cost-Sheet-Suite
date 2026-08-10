@@ -8,6 +8,7 @@ import rmOffsetsRouter from "./rm-offsets";
 import rmRatiosRouter from "./rm-ratios";
 import quotesRouter from "./quotes";
 import dashboardRouter from "./dashboard";
+import templateDefaultsRouter from "./template-defaults";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(rmOffsetsRouter);
 router.use(rmRatiosRouter);
 router.use(quotesRouter);
 router.use(dashboardRouter);
+router.use(templateDefaultsRouter);
 
 export default router;

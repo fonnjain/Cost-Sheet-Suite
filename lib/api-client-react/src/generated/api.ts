@@ -43,6 +43,9 @@ import type {
   RmRatiosInput,
   StructureCount,
   SuccessResponse,
+  TemplateDefault,
+  TemplateDefaultsHistoryEntry,
+  TemplateDefaultsInput,
   User,
   UserActivity,
   UserInput,
@@ -1742,6 +1745,232 @@ export function useGetRmRatiosHistory<TData = Awaited<ReturnType<typeof getRmRat
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetRmRatiosHistoryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetTemplateDefaultsUrl = () => {
+
+
+
+
+  return `/api/template-defaults`
+}
+
+/**
+ * @summary Get all admin-saved template default overrides (admin only)
+ */
+export const getTemplateDefaults = async ( options?: RequestInit): Promise<TemplateDefault[]> => {
+
+  return customFetch<TemplateDefault[]>(getGetTemplateDefaultsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTemplateDefaultsQueryKey = () => {
+    return [
+    `/api/template-defaults`
+    ] as const;
+    }
+
+
+export const getGetTemplateDefaultsQueryOptions = <TData = Awaited<ReturnType<typeof getTemplateDefaults>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTemplateDefaults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTemplateDefaultsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTemplateDefaults>>> = ({ signal }) => getTemplateDefaults({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTemplateDefaults>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTemplateDefaultsQueryResult = NonNullable<Awaited<ReturnType<typeof getTemplateDefaults>>>
+export type GetTemplateDefaultsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get all admin-saved template default overrides (admin only)
+ */
+
+export function useGetTemplateDefaults<TData = Awaited<ReturnType<typeof getTemplateDefaults>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTemplateDefaults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTemplateDefaultsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSaveTemplateDefaultsUrl = (structureName: string,) => {
+
+
+
+
+  return `/api/template-defaults/${structureName}`
+}
+
+/**
+ * @summary Save template default overrides for one structure (admin only)
+ */
+export const saveTemplateDefaults = async (structureName: string,
+    templateDefaultsInput: TemplateDefaultsInput, options?: RequestInit): Promise<TemplateDefault[]> => {
+
+  return customFetch<TemplateDefault[]>(getSaveTemplateDefaultsUrl(structureName),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      templateDefaultsInput,)
+  }
+);}
+
+
+
+
+export const getSaveTemplateDefaultsMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveTemplateDefaults>>, TError,{structureName: string;data: BodyType<TemplateDefaultsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveTemplateDefaults>>, TError,{structureName: string;data: BodyType<TemplateDefaultsInput>}, TContext> => {
+
+const mutationKey = ['saveTemplateDefaults'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveTemplateDefaults>>, {structureName: string;data: BodyType<TemplateDefaultsInput>}> = (props) => {
+          const {structureName,data} = props ?? {};
+
+          return  saveTemplateDefaults(structureName,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveTemplateDefaultsMutationResult = NonNullable<Awaited<ReturnType<typeof saveTemplateDefaults>>>
+    export type SaveTemplateDefaultsMutationBody = BodyType<TemplateDefaultsInput>
+    export type SaveTemplateDefaultsMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Save template default overrides for one structure (admin only)
+ */
+export const useSaveTemplateDefaults = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveTemplateDefaults>>, TError,{structureName: string;data: BodyType<TemplateDefaultsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveTemplateDefaults>>,
+        TError,
+        {structureName: string;data: BodyType<TemplateDefaultsInput>},
+        TContext
+      > => {
+      return useMutation(getSaveTemplateDefaultsMutationOptions(options));
+    }
+
+export const getGetTemplateDefaultsHistoryUrl = () => {
+
+
+
+
+  return `/api/template-defaults/history`
+}
+
+/**
+ * @summary Get change history for template defaults (admin only)
+ */
+export const getTemplateDefaultsHistory = async ( options?: RequestInit): Promise<TemplateDefaultsHistoryEntry[]> => {
+
+  return customFetch<TemplateDefaultsHistoryEntry[]>(getGetTemplateDefaultsHistoryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTemplateDefaultsHistoryQueryKey = () => {
+    return [
+    `/api/template-defaults/history`
+    ] as const;
+    }
+
+
+export const getGetTemplateDefaultsHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getTemplateDefaultsHistory>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTemplateDefaultsHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTemplateDefaultsHistoryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTemplateDefaultsHistory>>> = ({ signal }) => getTemplateDefaultsHistory({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTemplateDefaultsHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTemplateDefaultsHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getTemplateDefaultsHistory>>>
+export type GetTemplateDefaultsHistoryQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get change history for template defaults (admin only)
+ */
+
+export function useGetTemplateDefaultsHistory<TData = Awaited<ReturnType<typeof getTemplateDefaultsHistory>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTemplateDefaultsHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTemplateDefaultsHistoryQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

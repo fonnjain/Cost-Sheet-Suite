@@ -1,4 +1,6 @@
 - [PDF export in cost-sheet](pdf-export.md) — jspdf+autotable from data (not html2canvas); strip ₹ before rendering; mirror UI highlights via passed-in flags.
+- [Template Defaults Admin Editor](template-defaults.md) — per-structure "purple-coded" defaults stored in DB; merged into spec.defaults before buildDefaultInputs processes them; admin-only accordion in admin page.
+- [Additional Discount on Quotes](discount-on-quotes.md) — post-margin salesperson discount (pct or abs ₹/MT); quotePricePerMt stays pre-discount; netQuotePricePerMt computed at save; review page shows discount columns only when any quote has one.
 - [RM Price List read-only view](rm-price-list-view.md) — Base Price/Transport header rows sit 2 rows above each block's Make row; read them via a sibling function, not by editing readBlock.
 - [v6 make dropdowns](v6-make-dropdowns.md) — source calculator Make options from spec lists, not getDistinctMakes (it splits make tags on "/" and leaks Tested).
 - [v6 cost-sheet reconciliation](v6-reconciliation.md) — new quotes computed by v6 engine but stored in old flat shape via toLegacyShape; parity anchors 46231 / 76939@3%; data.ts auto-generated.

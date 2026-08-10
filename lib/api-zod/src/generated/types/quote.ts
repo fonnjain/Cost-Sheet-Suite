@@ -38,5 +38,20 @@ export interface Quote {
   approvedByName?: string | null;
   /** True for quotes computed by the pre-reconciliation engine; shown read-only */
   legacy: boolean;
+  /**
+     * 'pct' or 'abs' — mode of the additional discount applied by salesperson
+     * @nullable
+     */
+  discountMode?: string | null;
+  /**
+     * Discount magnitude: fraction for 'pct' (e.g. 0.05 = 5%) or absolute ₹/MT for 'abs'
+     * @nullable
+     */
+  discountValue?: number | null;
+  /**
+     * Quote price after additional discount. NULL when no discount applied.
+     * @nullable
+     */
+  netQuotePricePerMt?: number | null;
   createdAt: string;
 }

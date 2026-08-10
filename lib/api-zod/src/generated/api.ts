@@ -342,6 +342,54 @@ export const GetRmRatiosHistoryResponse = zod.array(GetRmRatiosHistoryResponseIt
 
 
 /**
+ * @summary Get all admin-saved template default overrides (admin only)
+ */
+export const GetTemplateDefaultsResponseItem = zod.object({
+  "structureName": zod.string(),
+  "fieldKey": zod.string(),
+  "fieldValue": zod.number(),
+  "updatedByName": zod.string(),
+  "updatedAt": zod.string()
+})
+export const GetTemplateDefaultsResponse = zod.array(GetTemplateDefaultsResponseItem)
+
+
+/**
+ * @summary Save template default overrides for one structure (admin only)
+ */
+export const SaveTemplateDefaultsParams = zod.object({
+  "structureName": zod.coerce.string()
+})
+
+export const SaveTemplateDefaultsBody = zod.object({
+  "fields": zod.record(zod.string(), zod.number()).describe('Map of field_key -> value for this structure')
+})
+
+export const SaveTemplateDefaultsResponseItem = zod.object({
+  "structureName": zod.string(),
+  "fieldKey": zod.string(),
+  "fieldValue": zod.number(),
+  "updatedByName": zod.string(),
+  "updatedAt": zod.string()
+})
+export const SaveTemplateDefaultsResponse = zod.array(SaveTemplateDefaultsResponseItem)
+
+
+/**
+ * @summary Get change history for template defaults (admin only)
+ */
+export const GetTemplateDefaultsHistoryResponseItem = zod.object({
+  "structureName": zod.string(),
+  "fieldKey": zod.string(),
+  "oldValue": zod.number().nullish(),
+  "newValue": zod.number(),
+  "changedByName": zod.string(),
+  "changedAt": zod.string()
+})
+export const GetTemplateDefaultsHistoryResponse = zod.array(GetTemplateDefaultsHistoryResponseItem)
+
+
+/**
  * @summary List all quotes with optional filters
  */
 export const ListQuotesQueryParams = zod.object({
@@ -374,6 +422,9 @@ export const ListQuotesResponseItem = zod.object({
   "approvedAt": zod.string().nullish(),
   "approvedByName": zod.string().nullish(),
   "legacy": zod.boolean().describe('True for quotes computed by the pre-reconciliation engine; shown read-only'),
+  "discountMode": zod.string().nullish().describe('\'pct\' or \'abs\' — mode of the additional discount applied by salesperson'),
+  "discountValue": zod.number().nullish().describe('Discount magnitude: fraction for \'pct\' (e.g. 0.05 = 5%) or absolute ₹\/MT for \'abs\''),
+  "netQuotePricePerMt": zod.number().nullish().describe('Quote price after additional discount. NULL when no discount applied.'),
   "createdAt": zod.string()
 })
 export const ListQuotesResponse = zod.array(ListQuotesResponseItem)
@@ -399,7 +450,10 @@ export const CreateQuoteBody = zod.object({
 
 }).passthrough(),
   "generatedByName": zod.string(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "discountMode": zod.string().nullish(),
+  "discountValue": zod.number().nullish(),
+  "netQuotePricePerMt": zod.number().nullish()
 })
 
 
@@ -434,6 +488,9 @@ export const GetQuoteResponse = zod.object({
   "approvedAt": zod.string().nullish(),
   "approvedByName": zod.string().nullish(),
   "legacy": zod.boolean().describe('True for quotes computed by the pre-reconciliation engine; shown read-only'),
+  "discountMode": zod.string().nullish().describe('\'pct\' or \'abs\' — mode of the additional discount applied by salesperson'),
+  "discountValue": zod.number().nullish().describe('Discount magnitude: fraction for \'pct\' (e.g. 0.05 = 5%) or absolute ₹\/MT for \'abs\''),
+  "netQuotePricePerMt": zod.number().nullish().describe('Quote price after additional discount. NULL when no discount applied.'),
   "createdAt": zod.string()
 })
 
@@ -470,6 +527,9 @@ export const GetQuotesByProjectResponseItem = zod.object({
   "approvedAt": zod.string().nullish(),
   "approvedByName": zod.string().nullish(),
   "legacy": zod.boolean().describe('True for quotes computed by the pre-reconciliation engine; shown read-only'),
+  "discountMode": zod.string().nullish().describe('\'pct\' or \'abs\' — mode of the additional discount applied by salesperson'),
+  "discountValue": zod.number().nullish().describe('Discount magnitude: fraction for \'pct\' (e.g. 0.05 = 5%) or absolute ₹\/MT for \'abs\''),
+  "netQuotePricePerMt": zod.number().nullish().describe('Quote price after additional discount. NULL when no discount applied.'),
   "createdAt": zod.string()
 })
 export const GetQuotesByProjectResponse = zod.array(GetQuotesByProjectResponseItem)
@@ -506,6 +566,9 @@ export const ApproveQuoteResponse = zod.object({
   "approvedAt": zod.string().nullish(),
   "approvedByName": zod.string().nullish(),
   "legacy": zod.boolean().describe('True for quotes computed by the pre-reconciliation engine; shown read-only'),
+  "discountMode": zod.string().nullish().describe('\'pct\' or \'abs\' — mode of the additional discount applied by salesperson'),
+  "discountValue": zod.number().nullish().describe('Discount magnitude: fraction for \'pct\' (e.g. 0.05 = 5%) or absolute ₹\/MT for \'abs\''),
+  "netQuotePricePerMt": zod.number().nullish().describe('Quote price after additional discount. NULL when no discount applied.'),
   "createdAt": zod.string()
 })
 
@@ -550,6 +613,9 @@ export const GetRecentQuotesResponseItem = zod.object({
   "approvedAt": zod.string().nullish(),
   "approvedByName": zod.string().nullish(),
   "legacy": zod.boolean().describe('True for quotes computed by the pre-reconciliation engine; shown read-only'),
+  "discountMode": zod.string().nullish().describe('\'pct\' or \'abs\' — mode of the additional discount applied by salesperson'),
+  "discountValue": zod.number().nullish().describe('Discount magnitude: fraction for \'pct\' (e.g. 0.05 = 5%) or absolute ₹\/MT for \'abs\''),
+  "netQuotePricePerMt": zod.number().nullish().describe('Quote price after additional discount. NULL when no discount applied.'),
   "createdAt": zod.string()
 })
 export const GetRecentQuotesResponse = zod.array(GetRecentQuotesResponseItem)

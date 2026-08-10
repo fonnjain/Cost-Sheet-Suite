@@ -203,6 +203,33 @@ export interface DailyLockInput {
   locked: boolean;
 }
 
+export interface TemplateDefault {
+  structureName: string;
+  fieldKey: string;
+  fieldValue: number;
+  updatedByName: string;
+  updatedAt: string;
+}
+
+/**
+ * Map of field_key -> value for this structure
+ */
+export type TemplateDefaultsInputFields = {[key: string]: number};
+
+export interface TemplateDefaultsInput {
+  /** Map of field_key -> value for this structure */
+  fields: TemplateDefaultsInputFields;
+}
+
+export interface TemplateDefaultsHistoryEntry {
+  structureName: string;
+  fieldKey: string;
+  oldValue?: number | null;
+  newValue: number;
+  changedByName: string;
+  changedAt: string;
+}
+
 /**
  * Full JSON of all cost inputs
  */
@@ -243,6 +270,21 @@ export interface Quote {
   approvedByName?: string | null;
   /** True for quotes computed by the pre-reconciliation engine; shown read-only */
   legacy: boolean;
+  /**
+     * 'pct' or 'abs' — mode of the additional discount applied by salesperson
+     * @nullable
+     */
+  discountMode?: string | null;
+  /**
+     * Discount magnitude: fraction for 'pct' (e.g. 0.05 = 5%) or absolute ₹/MT for 'abs'
+     * @nullable
+     */
+  discountValue?: number | null;
+  /**
+     * Quote price after additional discount. NULL when no discount applied.
+     * @nullable
+     */
+  netQuotePricePerMt?: number | null;
   createdAt: string;
 }
 
@@ -268,6 +310,12 @@ export interface QuoteInput {
   generatedByName: string;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  discountMode?: string | null;
+  /** @nullable */
+  discountValue?: number | null;
+  /** @nullable */
+  netQuotePricePerMt?: number | null;
 }
 
 export interface DashboardSummary {
