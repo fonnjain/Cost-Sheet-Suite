@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { quotesTable } from "@workspace/db/schema";
+import { quotesTable, rmOffsetsTable, rmPricesTable } from "@workspace/db/schema";
 import { requireAuth } from "../middlewares/auth";
 import {
   CreateQuoteBody,
@@ -14,7 +14,12 @@ import {
 
 const router = Router();
 
-function formatQuote(q: typeof quotesTable.$inferSelect) {
+type QuoteSources = {
+  rmPrice?: typeof rmPricesTable.$inferSelect;
+  rmOffset?: typeof rmOffsetsTable.$inferSelect;
+};
+
+function formatQuote(q: typeof quotesTable.$inferSelect, sources: QuoteSources = {}) {
   return {
     id: q.id,
     customerId: q.customerId,
@@ -27,6 +32,22 @@ function formatQuote(q: typeof quotesTable.$inferSelect) {
     totalCost: Number(q.totalCost),
     steelPrice: q.steelPrice != null ? Number(q.steelPrice) : null,
     zincPrice: q.zincPrice != null ? Number(q.zincPrice) : null,
+    rmPricesId: q.rmPricesId ?? null,
+    rmOffsetsId: q.rmOffsetsId ?? null,
+    rmPriceSource: sources.rmPrice
+      ? {
+          id: sources.rmPrice.id,
+          createdAt: sources.rmPrice.createdAt.toISOString(),
+          createdByName: sources.rmPrice.createdByName,
+        }
+      : null,
+    rmOffsetSource: sources.rmOffset
+      ? {
+          id: sources.rmOffset.id,
+          updatedAt: sources.rmOffset.updatedAt.toISOString(),
+          updatedByName: sources.rmOffset.updatedByName,
+        }
+      : null,
     inputs: q.inputs,
     costBreakdown: q.costBreakdown,
     generatedByName: q.generatedByName,
@@ -40,6 +61,40 @@ function formatQuote(q: typeof quotesTable.$inferSelect) {
     netQuotePricePerMt: q.netQuotePricePerMt != null ? Number(q.netQuotePricePerMt) : null,
     createdAt: q.createdAt?.toISOString(),
   };
+}
+
+async function formatQuotes(quotes: (typeof quotesTable.$inferSelect)[]) {
+  const rmPriceIds = [...new Set(quotes.flatMap((q) => q.rmPricesId == null ? [] : [q.rmPricesId]))];
+  const rmOffsetIds = [...new Set(quotes.flatMap((q) => q.rmOffsetsId == null ? [] : [q.rmOffsetsId]))];
+  const [priceRows, offsetRows] = await Promise.all([
+    rmPriceIds.length > 0
+      ? db.select().from(rmPricesTable).where(inArray(rmPricesTable.id, rmPriceIds))
+      : Promise.resolve([] as (typeof rmPricesTable.$inferSelect)[]),
+    rmOffsetIds.length > 0
+      ? db.select().from(rmOffsetsTable).where(inArray(rmOffsetsTable.id, rmOffsetIds))
+      : Promise.resolve([] as (typeof rmOffsetsTable.$inferSelect)[]),
+  ]);
+  const priceById = new Map(priceRows.map((row) => [row.id, row]));
+  const offsetById = new Map(offsetRows.map((row) => [row.id, row]));
+  return quotes.map((quote) => formatQuote(quote, {
+    rmPrice: quote.rmPricesId == null ? undefined : priceById.get(quote.rmPricesId),
+    rmOffset: quote.rmOffsetsId == null ? undefined : offsetById.get(quote.rmOffsetsId),
+  }));
+}
+
+async function findQuoteSources(
+  rmPricesId: number | null | undefined,
+  rmOffsetsId: number | null | undefined,
+) {
+  const [[rmPrice], [rmOffset]] = await Promise.all([
+    rmPricesId == null
+      ? Promise.resolve([] as (typeof rmPricesTable.$inferSelect)[])
+      : db.select().from(rmPricesTable).where(eq(rmPricesTable.id, rmPricesId)).limit(1),
+    rmOffsetsId == null
+      ? Promise.resolve([] as (typeof rmOffsetsTable.$inferSelect)[])
+      : db.select().from(rmOffsetsTable).where(eq(rmOffsetsTable.id, rmOffsetsId)).limit(1),
+  ]);
+  return { rmPrice, rmOffset };
 }
 
 router.get("/quotes", requireAuth, async (req, res): Promise<void> => {
@@ -59,7 +114,7 @@ router.get("/quotes", requireAuth, async (req, res): Promise<void> => {
   query = query.orderBy(desc(quotesTable.createdAt)).limit(params.data.limit ?? 50);
 
   const quotes = await query;
-  res.json(quotes.map(formatQuote));
+  res.json(await formatQuotes(quotes));
 });
 
 router.post("/quotes", requireAuth, async (req, res): Promise<void> => {
@@ -70,6 +125,41 @@ router.post("/quotes", requireAuth, async (req, res): Promise<void> => {
   }
 
   const { customerId, projectRef } = parsed.data;
+  const sourceInput = parsed.data as typeof parsed.data & {
+    rmPricesId?: number | null;
+    rmOffsetsId?: number | null;
+  };
+  let sources = await findQuoteSources(sourceInput.rmPricesId, sourceInput.rmOffsetsId);
+  if (sourceInput.rmPricesId != null && !sources.rmPrice) {
+    res.status(400).json({ error: "The selected RM price revision no longer exists." });
+    return;
+  }
+  if (sourceInput.rmOffsetsId != null && !sources.rmOffset) {
+    res.status(400).json({ error: "The selected RM offset revision no longer exists." });
+    return;
+  }
+  // New clients send the exact revisions their calculator loaded. Keep older clients
+  // traceable too by resolving the latest retained revisions at the save boundary.
+  if (sourceInput.rmPricesId === undefined || sourceInput.rmOffsetsId === undefined) {
+    const [[latestPrice], [latestOffset]] = await Promise.all([
+      sourceInput.rmPricesId === undefined
+        ? db.select().from(rmPricesTable).orderBy(desc(rmPricesTable.createdAt), desc(rmPricesTable.id)).limit(1)
+        : Promise.resolve([] as (typeof rmPricesTable.$inferSelect)[]),
+      sourceInput.rmOffsetsId === undefined
+        ? db.select().from(rmOffsetsTable).orderBy(desc(rmOffsetsTable.updatedAt), desc(rmOffsetsTable.id)).limit(1)
+        : Promise.resolve([] as (typeof rmOffsetsTable.$inferSelect)[]),
+    ]);
+    sources = {
+      rmPrice: sourceInput.rmPricesId === undefined ? latestPrice : sources.rmPrice,
+      rmOffset: sourceInput.rmOffsetsId === undefined ? latestOffset : sources.rmOffset,
+    };
+  }
+  const rmPricesId = sourceInput.rmPricesId === undefined
+    ? sources.rmPrice?.id ?? null
+    : sourceInput.rmPricesId ?? null;
+  const rmOffsetsId = sourceInput.rmOffsetsId === undefined
+    ? sources.rmOffset?.id ?? null
+    : sourceInput.rmOffsetsId ?? null;
 
   const existing = await db
     .select({ revision: quotesTable.revision })
@@ -92,6 +182,8 @@ router.post("/quotes", requireAuth, async (req, res): Promise<void> => {
       totalCost: String(parsed.data.totalCost),
       steelPrice: parsed.data.steelPrice != null ? String(parsed.data.steelPrice) : null,
       zincPrice: parsed.data.zincPrice != null ? String(parsed.data.zincPrice) : null,
+      rmPricesId,
+      rmOffsetsId,
       inputs: parsed.data.inputs,
       costBreakdown: parsed.data.costBreakdown,
       generatedByName: parsed.data.generatedByName,
@@ -107,7 +199,7 @@ router.post("/quotes", requireAuth, async (req, res): Promise<void> => {
     })
     .returning();
 
-  res.status(201).json(formatQuote(quote));
+  res.status(201).json(formatQuote(quote, sources));
 });
 
 router.get("/quotes/by-project", requireAuth, async (req, res): Promise<void> => {
@@ -128,7 +220,7 @@ router.get("/quotes/by-project", requireAuth, async (req, res): Promise<void> =>
     )
     .orderBy(desc(quotesTable.revision));
 
-  res.json(quotes.map(formatQuote));
+  res.json(await formatQuotes(quotes));
 });
 
 router.post("/quotes/:id/approve", requireAuth, async (req, res): Promise<void> => {
@@ -171,7 +263,7 @@ router.post("/quotes/:id/approve", requireAuth, async (req, res): Promise<void> 
     return row;
   });
 
-  res.json(formatQuote(approved));
+  res.json((await formatQuotes([approved]))[0]);
 });
 
 router.get("/quotes/:id", requireAuth, async (req, res): Promise<void> => {
@@ -192,7 +284,7 @@ router.get("/quotes/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(formatQuote(quote));
+  res.json((await formatQuotes([quote]))[0]);
 });
 
 router.get("/review/projects", requireAuth, async (req, res): Promise<void> => {

@@ -1,6 +1,8 @@
 import { pgTable, serial, integer, text, numeric, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { rmPricesTable } from "./rm_prices";
+import { rmOffsetsTable } from "./rm_offsets";
 
 export const quotesTable = pgTable("quotes", {
   id: serial("id").primaryKey(),
@@ -14,6 +16,10 @@ export const quotesTable = pgTable("quotes", {
   totalCost: numeric("total_cost", { precision: 12, scale: 2 }).notNull(),
   steelPrice: numeric("steel_price", { precision: 12, scale: 2 }),
   zincPrice: numeric("zinc_price", { precision: 12, scale: 2 }),
+  // The exact persisted RM/offset revisions that supplied this quote's price inputs.
+  // Null for historical quotes created before revision traceability was introduced.
+  rmPricesId: integer("rm_prices_id").references(() => rmPricesTable.id, { onDelete: "restrict" }),
+  rmOffsetsId: integer("rm_offsets_id").references(() => rmOffsetsTable.id, { onDelete: "restrict" }),
   inputs: jsonb("inputs").notNull(),
   costBreakdown: jsonb("cost_breakdown").notNull(),
   generatedByName: text("generated_by_name").notNull(),

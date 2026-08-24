@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { Unlock, Lock, Shield, Trash2, UserCog, FileText, ChevronDown, ChevronRight, UserPlus, KeyRound, Settings2, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MASTER_SPECS } from "@/lib/v6/engine";
+import { RmPriceHistory } from "@/components/rm-price-history";
 
 // ---------- Template Defaults Constants ----------
 
@@ -829,42 +830,7 @@ export default function Admin() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/50">
-        <CardHeader className="bg-card/50 border-b border-border/50">
-          <CardTitle>RM Prices Audit Log</CardTitle>
-          <CardDescription>History of all price updates.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-4">Date</TableHead>
-                <TableHead>Updated By</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loadingHistory ? (
-                <TableRow><TableCell colSpan={3} className="text-center py-4">Loading...</TableCell></TableRow>
-              ) : history?.slice(0, 10).map((h: any) => (
-                <TableRow key={h.id}>
-                  <TableCell className="pl-4 font-mono text-sm">
-                    {format(new Date(h.createdAt), 'dd MMM yyyy, HH:mm')}
-                  </TableCell>
-                  <TableCell>{h.createdByName}</TableCell>
-                  <TableCell>
-                    {h.isWindowUnlocked ? (
-                      <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20">Unlocked Window</Badge>
-                    ) : (
-                      <Badge variant="outline" className="bg-card">Standard</Badge>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <RmPriceHistory history={history} isLoading={loadingHistory} />
     </div>
   );
 }

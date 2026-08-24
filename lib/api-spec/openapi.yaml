@@ -304,16 +304,22 @@ paths:
     get:
       operationId: getRmPricesHistory
       tags: [rmPrices]
-      summary: Get RM prices history
+      summary: Get every retained RM price revision (admin only)
       responses:
         "200":
-          description: RM prices history
+          description: Full RM prices history, most recent first
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/RmPrices"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /rm-prices/unlock-twice-monthly:
     post:
@@ -883,6 +889,19 @@ components:
         isDailyLocked:
           type: boolean
           description: True when an admin has locked RM file inputs for today. Auto-clears the next day.
+        offsetVersion:
+          type: ["object", "null"]
+          description: The latest RM offset revision saved at or before this RM price revision. Null means workbook default offsets applied.
+          required: [id, offsetData, updatedByName, updatedAt]
+          properties:
+            id:
+              type: integer
+            offsetData:
+              type: object
+            updatedByName:
+              type: string
+            updatedAt:
+              type: string
 
     RmPricesInput:
       type: object
@@ -895,11 +914,17 @@ components:
 
     RmOffsets:
       type: object
-      required: [offsetData]
+      required: [id, offsetData, updatedByName, updatedAt]
       properties:
+        id:
+          type: ["integer", "null"]
         offsetData:
           type: object
           description: JSON blob of editable offsets keyed by cell ref (E9, F9, G9, I9, J9, K9, L9, D18, E18)
+        updatedByName:
+          type: ["string", "null"]
+        updatedAt:
+          type: ["string", "null"]
 
     RmOffsetsInput:
       type: object
@@ -1048,6 +1073,34 @@ components:
           type: ["number", "null"]
         zincPrice:
           type: ["number", "null"]
+        rmPricesId:
+          type: ["integer", "null"]
+          description: Retained RM price revision used when this quote was calculated.
+        rmOffsetsId:
+          type: ["integer", "null"]
+          description: Retained RM offset revision used when this quote was calculated; null means workbook defaults.
+        rmPriceSource:
+          type: ["object", "null"]
+          description: Dated attribution for the RM price revision used by this quote.
+          required: [id, createdAt, createdByName]
+          properties:
+            id:
+              type: integer
+            createdAt:
+              type: string
+            createdByName:
+              type: string
+        rmOffsetSource:
+          type: ["object", "null"]
+          description: Dated attribution for the RM offset revision used by this quote.
+          required: [id, updatedAt, updatedByName]
+          properties:
+            id:
+              type: integer
+            updatedAt:
+              type: string
+            updatedByName:
+              type: string
         inputs:
           type: object
           description: Full JSON of all cost inputs
@@ -1101,6 +1154,12 @@ components:
           type: ["number", "null"]
         zincPrice:
           type: ["number", "null"]
+        rmPricesId:
+          type: ["integer", "null"]
+          description: RM price revision loaded by the calculator. The server validates that it exists.
+        rmOffsetsId:
+          type: ["integer", "null"]
+          description: RM offset revision loaded by the calculator, or null when only workbook default offsets applied.
         inputs:
           type: object
         costBreakdown:

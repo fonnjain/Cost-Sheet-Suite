@@ -10,3 +10,4 @@
 - [v6 workbook parity](v6-workbook-parity.md) — verify vs blank-template state (kv unselected, micron 0); defaults with explicit 0 need `??` not `||` in prefill chains.
 - [RM price import workflow](rm-import-workflow.md) — update BOTH data.ts (gen-data script) AND rm_prices DB (update-rm-prices script); check angle cols + DEFAULT_OFFSETS when supplier set or spreads change.
 - [Drizzle pg error codes](drizzle-pg-error-codes.md) — SQLSTATE (23505 etc.) is on err.cause.code, not err.code; check both when mapping DB errors to HTTP statuses.
+- [RM revision provenance](rm-revision-provenance.md) — price and offset revisions are retained audit records; quote links are nullable to preserve legacy values.

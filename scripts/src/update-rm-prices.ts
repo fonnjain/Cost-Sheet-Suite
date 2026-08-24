@@ -9,6 +9,12 @@ import { db } from "@workspace/db";
 import { rmPricesTable, rmOffsetsTable } from "@workspace/db/schema";
 
 async function run() {
+  // An automated workbook import has no request/session context. A caller can set
+  // RM_IMPORT_BY to preserve the person responsible for the import in the audit log.
+  const importedBy = process.env.RM_IMPORT_BY?.trim();
+  const importLabel = importedBy
+    ? `Excel import by ${importedBy}`
+    : "Excel import (automated Aug-2026 update)";
   // ── 1. Read all rm_prices and find the latest by id ─────────────────────
   const allPrices = await db.select().from(rmPricesTable);
   const current = allPrices.sort((a, b) => b.id - a.id)[0];
@@ -56,18 +62,12 @@ async function run() {
   for (const k of ["C12", "D12", "E12", "C15", "D15", "E15"])
     console.log(`  ${k}: ${newTwice[k]}`);
 
-  // ── 3. Insert new rm_prices row (API always reads latest by createdAt) ───
-  await db.insert(rmPricesTable).values({
-    dailyData: newDaily,
-    twiceMonthlyData: newTwice,
-    createdByName: "System (Aug-2026 price update)",
-    isWindowUnlocked: false,
-  });
-  console.log("\n✓ New rm_prices row inserted.");
-
-  // ── 4. Check rm_offsets for stale D18/E18 entries ───────────────────────
+  // ── 3. Resolve the immutable offset snapshot before saving the price ──────
+  // A price revision must point at the exact offset row used by its derived
+  // D18/E18 values; create the changed offset row first when necessary.
   const allOffsets = await db.select().from(rmOffsetsTable);
   const latestOffsets = allOffsets.sort((a, b) => b.id - a.id)[0];
+  let offsetRevisionId = latestOffsets?.id ?? null;
 
   if (latestOffsets) {
     const off = (latestOffsets.offsetData as Record<string, number>) ?? {};
@@ -75,17 +75,28 @@ async function run() {
       console.warn(`\n⚠ rm_offsets has stored D18=${off["D18"]}, E18=${off["E18"]}.`);
       console.warn("  These override DEFAULT_OFFSETS. Inserting updated row (7000/5500)...");
       const newOffsets = { ...off, D18: 7000, E18: 5500 };
-      await db.insert(rmOffsetsTable).values({
+      const [savedOffset] = await db.insert(rmOffsetsTable).values({
         offsetData: newOffsets,
-        updatedByName: "System (Aug-2026 offset update)",
-      });
-      console.log("  ✓ rm_offsets updated.");
+        updatedByName: importLabel,
+      }).returning();
+      offsetRevisionId = savedOffset.id;
+      console.log(`  ✓ rm_offsets updated (revision #${savedOffset.id}).`);
     } else {
       console.log("\n✓ rm_offsets has no D18/E18 overrides — DEFAULT_OFFSETS (7000/5500) will apply.");
     }
   } else {
     console.log("\n✓ No rm_offsets row — DEFAULT_OFFSETS (7000/5500) will apply.");
   }
+
+  // ── 4. Insert new rm_prices row with its exact offset revision ───────────
+  await db.insert(rmPricesTable).values({
+    dailyData: newDaily,
+    twiceMonthlyData: newTwice,
+    createdByName: importLabel,
+    rmOffsetsId: offsetRevisionId,
+    isWindowUnlocked: false,
+  });
+  console.log(`\n✓ New rm_prices row inserted (offset revision: ${offsetRevisionId ?? "workbook defaults"}).`);
 
   console.log("\nAuto-computed values the engine will produce:");
   const H9 = 44500, C18 = 54000;

@@ -114,7 +114,7 @@ async function seed() {
     await db.insert(rmPricesTable).values({
       dailyData: DEFAULT_DAILY_DATA,
       twiceMonthlyData: DEFAULT_TWICE_MONTHLY_DATA,
-      createdByName: "System",
+      createdByName: "Initial workbook seed",
       isWindowUnlocked: false,
     });
     console.log("Seeded initial RM prices.");

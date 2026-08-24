@@ -14,7 +14,12 @@ router.get("/rm-offsets", requireAuth, async (_req, res): Promise<void> => {
     .orderBy(desc(rmOffsetsTable.updatedAt))
     .limit(1);
 
-  res.json({ offsetData: (latest?.offsetData as Record<string, number>) ?? {} });
+  res.json({
+    id: latest?.id ?? null,
+    offsetData: (latest?.offsetData as Record<string, number>) ?? {},
+    updatedByName: latest?.updatedByName ?? null,
+    updatedAt: latest?.updatedAt?.toISOString() ?? null,
+  });
 });
 
 router.post("/rm-offsets", requireAuth, async (req, res): Promise<void> => {
@@ -32,7 +37,12 @@ router.post("/rm-offsets", requireAuth, async (req, res): Promise<void> => {
     })
     .returning();
 
-  res.status(201).json({ offsetData: saved.offsetData });
+  res.status(201).json({
+    id: saved.id,
+    offsetData: saved.offsetData,
+    updatedByName: saved.updatedByName,
+    updatedAt: saved.updatedAt.toISOString(),
+  });
 });
 
 export default router;

@@ -7,6 +7,8 @@
  */
 import type { QuoteCostBreakdown } from './quoteCostBreakdown';
 import type { QuoteInputs } from './quoteInputs';
+import type { QuoteRmOffsetSource } from './quoteRmOffsetSource';
+import type { QuoteRmPriceSource } from './quoteRmPriceSource';
 
 export interface Quote {
   id: number;
@@ -24,6 +26,26 @@ export interface Quote {
   steelPrice?: number | null;
   /** @nullable */
   zincPrice?: number | null;
+  /**
+     * Retained RM price revision used when this quote was calculated.
+     * @nullable
+     */
+  rmPricesId?: number | null;
+  /**
+     * Retained RM offset revision used when this quote was calculated; null means workbook defaults.
+     * @nullable
+     */
+  rmOffsetsId?: number | null;
+  /**
+     * Dated attribution for the RM price revision used by this quote.
+     * @nullable
+     */
+  rmPriceSource?: QuoteRmPriceSource;
+  /**
+     * Dated attribution for the RM offset revision used by this quote.
+     * @nullable
+     */
+  rmOffsetSource?: QuoteRmOffsetSource;
   /** Full JSON of all cost inputs */
   inputs: QuoteInputs;
   /** Computed cost breakdown */

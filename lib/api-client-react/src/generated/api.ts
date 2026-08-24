@@ -1174,7 +1174,7 @@ export const getGetRmPricesHistoryUrl = () => {
 }
 
 /**
- * @summary Get RM prices history
+ * @summary Get every retained RM price revision (admin only)
  */
 export const getRmPricesHistory = async ( options?: RequestInit): Promise<RmPrices[]> => {
 
@@ -1198,7 +1198,7 @@ export const getGetRmPricesHistoryQueryKey = () => {
     }
 
 
-export const getGetRmPricesHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getRmPricesHistory>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRmPricesHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetRmPricesHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getRmPricesHistory>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRmPricesHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -1217,14 +1217,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetRmPricesHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getRmPricesHistory>>>
-export type GetRmPricesHistoryQueryError = ErrorType<unknown>
+export type GetRmPricesHistoryQueryError = ErrorType<ErrorResponse>
 
 
 /**
- * @summary Get RM prices history
+ * @summary Get every retained RM price revision (admin only)
  */
 
-export function useGetRmPricesHistory<TData = Awaited<ReturnType<typeof getRmPricesHistory>>, TError = ErrorType<unknown>>(
+export function useGetRmPricesHistory<TData = Awaited<ReturnType<typeof getRmPricesHistory>>, TError = ErrorType<ErrorResponse>>(
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRmPricesHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {

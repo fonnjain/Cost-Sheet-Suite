@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, lte } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { rmPricesTable, rmOffsetsTable, rmDailyLocksTable } from "@workspace/db/schema";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
@@ -7,7 +7,19 @@ import { SaveRmPricesBody, UnlockTwiceMonthlyBody, ToggleDailyLockBody } from "@
 
 const router = Router();
 
-function formatRmPrice(r: typeof rmPricesTable.$inferSelect) {
+function formatRmOffset(r: typeof rmOffsetsTable.$inferSelect) {
+  return {
+    id: r.id,
+    offsetData: r.offsetData,
+    updatedByName: r.updatedByName,
+    updatedAt: r.updatedAt.toISOString(),
+  };
+}
+
+function formatRmPrice(
+  r: typeof rmPricesTable.$inferSelect,
+  offsetVersion: typeof rmOffsetsTable.$inferSelect | undefined,
+) {
   return {
     id: r.id,
     dailyData: r.dailyData,
@@ -16,6 +28,7 @@ function formatRmPrice(r: typeof rmPricesTable.$inferSelect) {
     isWindowUnlocked: r.isWindowUnlocked,
     isWindowOverride: r.isWindowUnlocked,
     createdAt: r.createdAt?.toISOString(),
+    offsetVersion: offsetVersion ? formatRmOffset(offsetVersion) : null,
   };
 }
 
@@ -56,20 +69,38 @@ async function isDailyLockedToday(): Promise<boolean> {
   return isAfterAutoLockTime();
 }
 
-async function getLatestOffsetData(): Promise<Record<string, number>> {
+async function getLatestOffset(): Promise<typeof rmOffsetsTable.$inferSelect | undefined> {
   const [latest] = await db
     .select()
     .from(rmOffsetsTable)
     .orderBy(desc(rmOffsetsTable.updatedAt))
     .limit(1);
-  return (latest?.offsetData as Record<string, number>) ?? {};
+  return latest;
+}
+
+async function getApplicableOffset(createdAt: Date): Promise<typeof rmOffsetsTable.$inferSelect | undefined> {
+  const [offset] = await db
+    .select()
+    .from(rmOffsetsTable)
+    .where(lte(rmOffsetsTable.updatedAt, createdAt))
+    .orderBy(desc(rmOffsetsTable.updatedAt), desc(rmOffsetsTable.id))
+    .limit(1);
+  return offset;
+}
+
+async function getOffsetForPrice(price: typeof rmPricesTable.$inferSelect) {
+  if (price.rmOffsetsId != null) {
+    const [offset] = await db.select().from(rmOffsetsTable).where(eq(rmOffsetsTable.id, price.rmOffsetsId)).limit(1);
+    return offset;
+  }
+  // Legacy price revisions predate the immutable offset link. Resolve their
+  // historical offset once by timestamp; all new revisions store the exact ID.
+  return getApplicableOffset(price.createdAt);
 }
 
 router.get("/rm-prices", requireAuth, async (_req, res): Promise<void> => {
-  const [[latest], offsetData] = await Promise.all([
-    db.select().from(rmPricesTable).orderBy(desc(rmPricesTable.createdAt)).limit(1),
-    getLatestOffsetData(),
-  ]);
+  const [latest] = await db.select().from(rmPricesTable).orderBy(desc(rmPricesTable.createdAt), desc(rmPricesTable.id)).limit(1);
+  const latestOffset = latest ? await getOffsetForPrice(latest) : await getLatestOffset();
 
   const dailyLocked = await isDailyLockedToday();
 
@@ -78,19 +109,20 @@ router.get("/rm-prices", requireAuth, async (_req, res): Promise<void> => {
       id: 0,
       dailyData: {},
       twiceMonthlyData: {},
-      offsetData,
+      offsetData: (latestOffset?.offsetData as Record<string, number>) ?? {},
       createdByName: "System",
       isWindowUnlocked: isTwiceMonthlyWindow(),
       isWindowOverride: false,
       isDailyLocked: dailyLocked,
       createdAt: new Date().toISOString(),
+      offsetVersion: latestOffset ? formatRmOffset(latestOffset) : null,
     });
     return;
   }
 
   res.json({
-    ...formatRmPrice(latest),
-    offsetData,
+    ...formatRmPrice(latest, latestOffset),
+    offsetData: (latestOffset?.offsetData as Record<string, number>) ?? {},
     isWindowUnlocked: isTwiceMonthlyWindow() || latest.isWindowUnlocked,
     isWindowOverride: latest.isWindowUnlocked,
     isDailyLocked: dailyLocked,
@@ -109,7 +141,11 @@ router.post("/rm-prices", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const isUnlocked = isTwiceMonthlyWindow();
+  const [[previous], latestOffset] = await Promise.all([
+    db.select().from(rmPricesTable).orderBy(desc(rmPricesTable.createdAt), desc(rmPricesTable.id)).limit(1),
+    getLatestOffset(),
+  ]);
+  const isUnlocked = isTwiceMonthlyWindow() || previous?.isWindowUnlocked === true;
 
   const [saved] = await db
     .insert(rmPricesTable)
@@ -117,21 +153,24 @@ router.post("/rm-prices", requireAuth, async (req, res): Promise<void> => {
       dailyData: parsed.data.dailyData,
       twiceMonthlyData: parsed.data.twiceMonthlyData,
       createdByName: req.userName ?? "Unknown",
+      rmOffsetsId: latestOffset?.id ?? null,
       isWindowUnlocked: isUnlocked,
     })
     .returning();
 
-  res.status(201).json(formatRmPrice(saved));
+  res.status(201).json(formatRmPrice(saved, latestOffset));
 });
 
-router.get("/rm-prices/history", requireAuth, async (_req, res): Promise<void> => {
+router.get("/rm-prices/history", requireAuth, requireAdmin, async (_req, res): Promise<void> => {
   const history = await db
     .select()
     .from(rmPricesTable)
-    .orderBy(desc(rmPricesTable.createdAt))
-    .limit(30);
+    .orderBy(desc(rmPricesTable.createdAt), desc(rmPricesTable.id));
 
-  res.json(history.map(formatRmPrice));
+  const historyWithOffsets = await Promise.all(
+    history.map(async (price) => formatRmPrice(price, await getOffsetForPrice(price))),
+  );
+  res.json(historyWithOffsets);
 });
 
 router.post("/rm-prices/unlock-twice-monthly", requireAuth, requireAdmin, async (req, res): Promise<void> => {
@@ -148,11 +187,14 @@ router.post("/rm-prices/unlock-twice-monthly", requireAuth, requireAdmin, async 
     .orderBy(desc(rmPricesTable.createdAt))
     .limit(1);
 
-  if (latest) {
-    await db
-      .update(rmPricesTable)
-      .set({ isWindowUnlocked: unlocked })
-      .where(eq(rmPricesTable.id, latest.id));
+  if (latest && latest.isWindowUnlocked !== unlocked) {
+    await db.insert(rmPricesTable).values({
+      dailyData: latest.dailyData,
+      twiceMonthlyData: latest.twiceMonthlyData,
+      createdByName: `${req.userName ?? "Unknown"} (window override)`,
+      rmOffsetsId: latest.rmOffsetsId,
+      isWindowUnlocked: unlocked,
+    });
   }
 
   res.json({

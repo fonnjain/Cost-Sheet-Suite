@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { RmPricesDailyData } from './rmPricesDailyData';
+import type { RmPricesOffsetVersion } from './rmPricesOffsetVersion';
 import type { RmPricesTwiceMonthlyData } from './rmPricesTwiceMonthlyData';
 
 export interface RmPrices {
@@ -22,4 +23,9 @@ export interface RmPrices {
   isWindowOverride?: boolean;
   /** True when an admin has locked RM file inputs for today. Auto-clears the next day. */
   isDailyLocked?: boolean;
+  /**
+     * The latest RM offset revision saved at or before this RM price revision. Null means workbook default offsets applied.
+     * @nullable
+     */
+  offsetVersion?: RmPricesOffsetVersion;
 }

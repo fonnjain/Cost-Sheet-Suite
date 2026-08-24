@@ -404,6 +404,10 @@ export default function Calculator() {
           totalCost: results.total,
           steelPrice: results.rmPrice,
           zincPrice: Number(inputs.zinc_price) || 0,
+          // Persist the exact RM revision(s) used to calculate this quote.
+          // Existing quotes remain untouched because these are only sent for new saves.
+          rmPricesId: rmPrices?.id ?? null,
+          rmOffsetsId: rmOffsets?.id ?? null,
           inputs: legacyInputs,
           costBreakdown: legacyCostBreakdown,
           generatedByName: user?.name || "Unknown",

@@ -117,6 +117,17 @@ export type RmPricesDailyData = { [key: string]: unknown };
  */
 export type RmPricesTwiceMonthlyData = { [key: string]: unknown };
 
+/**
+ * The latest RM offset revision saved at or before this RM price revision. Null means workbook default offsets applied.
+ * @nullable
+ */
+export type RmPricesOffsetVersion = {
+  id: number;
+  offsetData: { [key: string]: unknown };
+  updatedByName: string;
+  updatedAt: string;
+} | null;
+
 export interface RmPrices {
   id: number;
   /** JSON blob of daily input values keyed by cell ref */
@@ -131,6 +142,11 @@ export interface RmPrices {
   isWindowOverride?: boolean;
   /** True when an admin has locked RM file inputs for today. Auto-clears the next day. */
   isDailyLocked?: boolean;
+  /**
+     * The latest RM offset revision saved at or before this RM price revision. Null means workbook default offsets applied.
+     * @nullable
+     */
+  offsetVersion?: RmPricesOffsetVersion;
 }
 
 export type RmPricesInputDailyData = { [key: string]: unknown };
@@ -148,8 +164,14 @@ export interface RmPricesInput {
 export type RmOffsetsOffsetData = { [key: string]: unknown };
 
 export interface RmOffsets {
+  /** @nullable */
+  id: number | null;
   /** JSON blob of editable offsets keyed by cell ref (E9, F9, G9, I9, J9, K9, L9, D18, E18) */
   offsetData: RmOffsetsOffsetData;
+  /** @nullable */
+  updatedByName: string | null;
+  /** @nullable */
+  updatedAt: string | null;
 }
 
 export type RmOffsetsInputOffsetData = { [key: string]: unknown };
@@ -231,6 +253,26 @@ export interface TemplateDefaultsHistoryEntry {
 }
 
 /**
+ * Dated attribution for the RM price revision used by this quote.
+ * @nullable
+ */
+export type QuoteRmPriceSource = {
+  id: number;
+  createdAt: string;
+  createdByName: string;
+} | null;
+
+/**
+ * Dated attribution for the RM offset revision used by this quote.
+ * @nullable
+ */
+export type QuoteRmOffsetSource = {
+  id: number;
+  updatedAt: string;
+  updatedByName: string;
+} | null;
+
+/**
  * Full JSON of all cost inputs
  */
 export type QuoteInputs = { [key: string]: unknown };
@@ -256,6 +298,26 @@ export interface Quote {
   steelPrice?: number | null;
   /** @nullable */
   zincPrice?: number | null;
+  /**
+     * Retained RM price revision used when this quote was calculated.
+     * @nullable
+     */
+  rmPricesId?: number | null;
+  /**
+     * Retained RM offset revision used when this quote was calculated; null means workbook defaults.
+     * @nullable
+     */
+  rmOffsetsId?: number | null;
+  /**
+     * Dated attribution for the RM price revision used by this quote.
+     * @nullable
+     */
+  rmPriceSource?: QuoteRmPriceSource;
+  /**
+     * Dated attribution for the RM offset revision used by this quote.
+     * @nullable
+     */
+  rmOffsetSource?: QuoteRmOffsetSource;
   /** Full JSON of all cost inputs */
   inputs: QuoteInputs;
   /** Computed cost breakdown */
@@ -305,6 +367,16 @@ export interface QuoteInput {
   steelPrice?: number | null;
   /** @nullable */
   zincPrice?: number | null;
+  /**
+     * RM price revision loaded by the calculator. The server validates that it exists.
+     * @nullable
+     */
+  rmPricesId?: number | null;
+  /**
+     * RM offset revision loaded by the calculator, or null when only workbook default offsets applied.
+     * @nullable
+     */
+  rmOffsetsId?: number | null;
   inputs: QuoteInputInputs;
   costBreakdown: QuoteInputCostBreakdown;
   generatedByName: string;

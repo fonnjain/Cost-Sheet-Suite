@@ -209,7 +209,15 @@ export const GetRmPricesResponse = zod.object({
   "createdByName": zod.string(),
   "isWindowUnlocked": zod.boolean().describe('Effective window state — true when today is the 1st\/16th OR the admin override is set.'),
   "isWindowOverride": zod.boolean().optional().describe('Raw admin override flag on the latest snapshot, independent of the schedule. Drives the admin lock\/unlock toggle.'),
-  "isDailyLocked": zod.boolean().optional().describe('True when an admin has locked RM file inputs for today. Auto-clears the next day.')
+  "isDailyLocked": zod.boolean().optional().describe('True when an admin has locked RM file inputs for today. Auto-clears the next day.'),
+  "offsetVersion": zod.object({
+  "id": zod.number(),
+  "offsetData": zod.object({
+
+}).passthrough(),
+  "updatedByName": zod.string(),
+  "updatedAt": zod.string()
+}).nullish().describe('The latest RM offset revision saved at or before this RM price revision. Null means workbook default offsets applied.')
 })
 
 
@@ -227,7 +235,7 @@ export const SaveRmPricesBody = zod.object({
 
 
 /**
- * @summary Get RM prices history
+ * @summary Get every retained RM price revision (admin only)
  */
 export const GetRmPricesHistoryResponseItem = zod.object({
   "id": zod.number(),
@@ -241,7 +249,15 @@ export const GetRmPricesHistoryResponseItem = zod.object({
   "createdByName": zod.string(),
   "isWindowUnlocked": zod.boolean().describe('Effective window state — true when today is the 1st\/16th OR the admin override is set.'),
   "isWindowOverride": zod.boolean().optional().describe('Raw admin override flag on the latest snapshot, independent of the schedule. Drives the admin lock\/unlock toggle.'),
-  "isDailyLocked": zod.boolean().optional().describe('True when an admin has locked RM file inputs for today. Auto-clears the next day.')
+  "isDailyLocked": zod.boolean().optional().describe('True when an admin has locked RM file inputs for today. Auto-clears the next day.'),
+  "offsetVersion": zod.object({
+  "id": zod.number(),
+  "offsetData": zod.object({
+
+}).passthrough(),
+  "updatedByName": zod.string(),
+  "updatedAt": zod.string()
+}).nullish().describe('The latest RM offset revision saved at or before this RM price revision. Null means workbook default offsets applied.')
 })
 export const GetRmPricesHistoryResponse = zod.array(GetRmPricesHistoryResponseItem)
 
@@ -276,9 +292,12 @@ export const ToggleDailyLockResponse = zod.object({
  * @summary Get current RM offset configuration
  */
 export const GetRmOffsetsResponse = zod.object({
+  "id": zod.number().nullable(),
   "offsetData": zod.object({
 
-}).passthrough().describe('JSON blob of editable offsets keyed by cell ref (E9, F9, G9, I9, J9, K9, L9, D18, E18)')
+}).passthrough().describe('JSON blob of editable offsets keyed by cell ref (E9, F9, G9, I9, J9, K9, L9, D18, E18)'),
+  "updatedByName": zod.string().nullable(),
+  "updatedAt": zod.string().nullable()
 })
 
 
@@ -410,6 +429,18 @@ export const ListQuotesResponseItem = zod.object({
   "totalCost": zod.number(),
   "steelPrice": zod.number().nullish(),
   "zincPrice": zod.number().nullish(),
+  "rmPricesId": zod.number().nullish().describe('Retained RM price revision used when this quote was calculated.'),
+  "rmOffsetsId": zod.number().nullish().describe('Retained RM offset revision used when this quote was calculated; null means workbook defaults.'),
+  "rmPriceSource": zod.object({
+  "id": zod.number(),
+  "createdAt": zod.string(),
+  "createdByName": zod.string()
+}).nullish().describe('Dated attribution for the RM price revision used by this quote.'),
+  "rmOffsetSource": zod.object({
+  "id": zod.number(),
+  "updatedAt": zod.string(),
+  "updatedByName": zod.string()
+}).nullish().describe('Dated attribution for the RM offset revision used by this quote.'),
   "inputs": zod.object({
 
 }).passthrough().describe('Full JSON of all cost inputs'),
@@ -443,6 +474,8 @@ export const CreateQuoteBody = zod.object({
   "totalCost": zod.number(),
   "steelPrice": zod.number().nullish(),
   "zincPrice": zod.number().nullish(),
+  "rmPricesId": zod.number().nullish().describe('RM price revision loaded by the calculator. The server validates that it exists.'),
+  "rmOffsetsId": zod.number().nullish().describe('RM offset revision loaded by the calculator, or null when only workbook default offsets applied.'),
   "inputs": zod.object({
 
 }).passthrough(),
@@ -476,6 +509,18 @@ export const GetQuoteResponse = zod.object({
   "totalCost": zod.number(),
   "steelPrice": zod.number().nullish(),
   "zincPrice": zod.number().nullish(),
+  "rmPricesId": zod.number().nullish().describe('Retained RM price revision used when this quote was calculated.'),
+  "rmOffsetsId": zod.number().nullish().describe('Retained RM offset revision used when this quote was calculated; null means workbook defaults.'),
+  "rmPriceSource": zod.object({
+  "id": zod.number(),
+  "createdAt": zod.string(),
+  "createdByName": zod.string()
+}).nullish().describe('Dated attribution for the RM price revision used by this quote.'),
+  "rmOffsetSource": zod.object({
+  "id": zod.number(),
+  "updatedAt": zod.string(),
+  "updatedByName": zod.string()
+}).nullish().describe('Dated attribution for the RM offset revision used by this quote.'),
   "inputs": zod.object({
 
 }).passthrough().describe('Full JSON of all cost inputs'),
@@ -515,6 +560,18 @@ export const GetQuotesByProjectResponseItem = zod.object({
   "totalCost": zod.number(),
   "steelPrice": zod.number().nullish(),
   "zincPrice": zod.number().nullish(),
+  "rmPricesId": zod.number().nullish().describe('Retained RM price revision used when this quote was calculated.'),
+  "rmOffsetsId": zod.number().nullish().describe('Retained RM offset revision used when this quote was calculated; null means workbook defaults.'),
+  "rmPriceSource": zod.object({
+  "id": zod.number(),
+  "createdAt": zod.string(),
+  "createdByName": zod.string()
+}).nullish().describe('Dated attribution for the RM price revision used by this quote.'),
+  "rmOffsetSource": zod.object({
+  "id": zod.number(),
+  "updatedAt": zod.string(),
+  "updatedByName": zod.string()
+}).nullish().describe('Dated attribution for the RM offset revision used by this quote.'),
   "inputs": zod.object({
 
 }).passthrough().describe('Full JSON of all cost inputs'),
@@ -554,6 +611,18 @@ export const ApproveQuoteResponse = zod.object({
   "totalCost": zod.number(),
   "steelPrice": zod.number().nullish(),
   "zincPrice": zod.number().nullish(),
+  "rmPricesId": zod.number().nullish().describe('Retained RM price revision used when this quote was calculated.'),
+  "rmOffsetsId": zod.number().nullish().describe('Retained RM offset revision used when this quote was calculated; null means workbook defaults.'),
+  "rmPriceSource": zod.object({
+  "id": zod.number(),
+  "createdAt": zod.string(),
+  "createdByName": zod.string()
+}).nullish().describe('Dated attribution for the RM price revision used by this quote.'),
+  "rmOffsetSource": zod.object({
+  "id": zod.number(),
+  "updatedAt": zod.string(),
+  "updatedByName": zod.string()
+}).nullish().describe('Dated attribution for the RM offset revision used by this quote.'),
   "inputs": zod.object({
 
 }).passthrough().describe('Full JSON of all cost inputs'),
@@ -601,6 +670,18 @@ export const GetRecentQuotesResponseItem = zod.object({
   "totalCost": zod.number(),
   "steelPrice": zod.number().nullish(),
   "zincPrice": zod.number().nullish(),
+  "rmPricesId": zod.number().nullish().describe('Retained RM price revision used when this quote was calculated.'),
+  "rmOffsetsId": zod.number().nullish().describe('Retained RM offset revision used when this quote was calculated; null means workbook defaults.'),
+  "rmPriceSource": zod.object({
+  "id": zod.number(),
+  "createdAt": zod.string(),
+  "createdByName": zod.string()
+}).nullish().describe('Dated attribution for the RM price revision used by this quote.'),
+  "rmOffsetSource": zod.object({
+  "id": zod.number(),
+  "updatedAt": zod.string(),
+  "updatedByName": zod.string()
+}).nullish().describe('Dated attribution for the RM offset revision used by this quote.'),
   "inputs": zod.object({
 
 }).passthrough().describe('Full JSON of all cost inputs'),

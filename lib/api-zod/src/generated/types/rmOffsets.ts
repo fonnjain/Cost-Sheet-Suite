@@ -8,6 +8,12 @@
 import type { RmOffsetsOffsetData } from './rmOffsetsOffsetData';
 
 export interface RmOffsets {
+  /** @nullable */
+  id: number | null;
   /** JSON blob of editable offsets keyed by cell ref (E9, F9, G9, I9, J9, K9, L9, D18, E18) */
   offsetData: RmOffsetsOffsetData;
+  /** @nullable */
+  updatedByName: string | null;
+  /** @nullable */
+  updatedAt: string | null;
 }

@@ -21,6 +21,16 @@ export interface QuoteInput {
   steelPrice?: number | null;
   /** @nullable */
   zincPrice?: number | null;
+  /**
+     * RM price revision loaded by the calculator. The server validates that it exists.
+     * @nullable
+     */
+  rmPricesId?: number | null;
+  /**
+     * RM offset revision loaded by the calculator, or null when only workbook default offsets applied.
+     * @nullable
+     */
+  rmOffsetsId?: number | null;
   inputs: QuoteInputInputs;
   costBreakdown: QuoteInputCostBreakdown;
   generatedByName: string;
