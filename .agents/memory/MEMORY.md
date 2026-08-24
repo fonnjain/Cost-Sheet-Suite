@@ -11,3 +11,4 @@
 - [RM price import workflow](rm-import-workflow.md) — update BOTH data.ts (gen-data script) AND rm_prices DB (update-rm-prices script); check angle cols + DEFAULT_OFFSETS when supplier set or spreads change.
 - [Drizzle pg error codes](drizzle-pg-error-codes.md) — SQLSTATE (23505 etc.) is on err.cause.code, not err.code; check both when mapping DB errors to HTTP statuses.
 - [RM revision provenance](rm-revision-provenance.md) — price and offset revisions are retained audit records; quote links are nullable to preserve legacy values.
+- [Database-backed API tests](database-backed-api-tests.md) — use an explicit test connection and a disposable schema; never run mutating integration tests against the application default database.
