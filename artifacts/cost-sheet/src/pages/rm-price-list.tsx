@@ -107,7 +107,7 @@ export default function RmPriceList() {
           <p className="text-muted-foreground">Read-only view of the RM source sheet, grouped by material</p>
         </div>
         <div className="text-sm font-mono bg-card px-3 py-1.5 rounded-md border border-border">
-          {format(new Date(), "dd MMM yyyy")}
+          {format(new Date(), "dd-MM-yyyy")}
         </div>
       </div>
 
@@ -120,7 +120,7 @@ export default function RmPriceList() {
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             <div>
               <span className="text-muted-foreground">RM Date: </span>
-              <span className="font-mono" data-testid="rmpricelist-rmdate">{view.rmDate}</span>
+              <span className="font-mono" data-testid="rmpricelist-rmdate">{format(new Date(`${view.rmDate}T00:00:00`), "dd-MM-yyyy")}</span>
             </div>
             <div>
               <span className="text-muted-foreground">Zinc: </span>

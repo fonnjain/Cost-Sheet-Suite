@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ChevronDown, ChevronRight, Clock3, Download, FileText, MapPinned, ReceiptText, UsersRound } from "lucide-react";
 import { useGetUserUsage, useListUsers, type UserUsageEvent } from "@workspace/api-client-react";
@@ -16,6 +16,65 @@ function localDate(offsetDays = 0) {
   date.setDate(date.getDate() + offsetDays);
   const tzOffset = date.getTimezoneOffset() * 60_000;
   return new Date(date.getTime() - tzOffset).toISOString().slice(0, 10);
+}
+
+function displayDate(isoDate: string) {
+  const [year, month, day] = isoDate.split("-");
+  return year && month && day ? `${day}-${month}-${year}` : isoDate;
+}
+
+function parseDisplayDate(value: string, min?: string, max?: string) {
+  const match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
+  if (!match) return null;
+  const [, day, month, year] = match;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (
+    date.getUTCFullYear() !== Number(year) ||
+    date.getUTCMonth() !== Number(month) - 1 ||
+    date.getUTCDate() !== Number(day)
+  ) return null;
+  const isoDate = `${year}-${month}-${day}`;
+  if (min && isoDate < min) return null;
+  if (max && isoDate > max) return null;
+  return isoDate;
+}
+
+function UsageDateInput({
+  value,
+  min,
+  max,
+  label,
+  testId,
+  onChange,
+}: {
+  value: string;
+  min?: string;
+  max?: string;
+  label: string;
+  testId: string;
+  onChange: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState(() => displayDate(value));
+  useEffect(() => setDraft(displayDate(value)), [value]);
+
+  return (
+    <Input
+      type="text"
+      inputMode="numeric"
+      value={draft}
+      placeholder="dd-mm-yyyy"
+      aria-label={label}
+      onChange={(event) => {
+        const next = event.target.value.replace(/[^\d-]/g, "").slice(0, 10);
+        setDraft(next);
+        const parsed = parseDisplayDate(next, min, max);
+        if (parsed) onChange(parsed);
+      }}
+      onBlur={() => setDraft(displayDate(value))}
+      className="h-8 w-[142px]"
+      data-testid={testId}
+    />
+  );
 }
 
 function formatDuration(seconds: number) {
@@ -65,11 +124,11 @@ export function UserUsageAudit() {
           <div className="flex flex-wrap items-end gap-2">
             <label className="grid gap-1 text-xs text-muted-foreground">
               From
-              <Input type="date" value={from} max={to} onChange={(event) => setFrom(event.target.value)} className="h-8 w-[142px]" data-testid="input-usage-from" />
+              <UsageDateInput value={from} max={to} label="From date" testId="input-usage-from" onChange={setFrom} />
             </label>
             <label className="grid gap-1 text-xs text-muted-foreground">
               To
-              <Input type="date" value={to} min={from} max={localDate()} onChange={(event) => setTo(event.target.value)} className="h-8 w-[142px]" data-testid="input-usage-to" />
+              <UsageDateInput value={to} min={from} max={localDate()} label="To date" testId="input-usage-to" onChange={setTo} />
             </label>
             <label className="grid gap-1 text-xs text-muted-foreground">
               User
@@ -139,7 +198,7 @@ export function UserUsageAudit() {
                           <div className="text-xs text-muted-foreground">{summary.email}</div>
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                          {summary.lastActiveAt ? format(new Date(summary.lastActiveAt), "dd MMM, HH:mm") : "No activity yet"}
+                          {summary.lastActiveAt ? format(new Date(summary.lastActiveAt), "dd-MM-yyyy, HH:mm") : "No activity yet"}
                         </TableCell>
                         <TableCell className="text-right font-mono">{summary.sessionCount}</TableCell>
                         <TableCell className="text-right font-mono whitespace-nowrap">{formatDuration(summary.activeSeconds)}</TableCell>
@@ -161,12 +220,12 @@ export function UserUsageAudit() {
                                   <p className="text-sm text-muted-foreground">No page visits have been recorded in this period.</p>
                                 ) : (
                                   <div className="rounded-md border border-border/50 overflow-hidden">
-                                    {summary.pages.map((page) => (
+                                            {summary.pages.map((page) => (
                                       <div key={page.path} className="grid grid-cols-[1fr_auto] gap-3 border-b border-border/40 px-3 py-2 text-sm last:border-b-0">
                                         <div>
                                           <code className="text-xs font-medium">{page.path}</code>
                                           <div className="text-xs text-muted-foreground mt-0.5">
-                                            {page.firstVisitedAt && page.lastVisitedAt ? `${format(new Date(page.firstVisitedAt), "dd MMM, HH:mm")} – ${format(new Date(page.lastVisitedAt), "dd MMM, HH:mm")}` : ""}
+                                            {page.firstVisitedAt && page.lastVisitedAt ? `${format(new Date(page.firstVisitedAt), "dd-MM-yyyy, HH:mm")} – ${format(new Date(page.lastVisitedAt), "dd-MM-yyyy, HH:mm")}` : ""}
                                           </div>
                                         </div>
                                         <Badge variant="outline" className="self-center font-mono">{page.visits} visit{page.visits === 1 ? "" : "s"}</Badge>
@@ -184,7 +243,7 @@ export function UserUsageAudit() {
                                     {summary.recentEvents.map((event) => (
                                       <div key={event.id} className="flex items-start justify-between gap-3 border-b border-border/40 px-3 py-2 text-sm last:border-b-0">
                                         <span>{eventLabel(event)}</span>
-                                        <span className="shrink-0 text-xs text-muted-foreground whitespace-nowrap">{format(new Date(event.occurredAt), "dd MMM, HH:mm")}</span>
+                                        <span className="shrink-0 text-xs text-muted-foreground whitespace-nowrap">{format(new Date(event.occurredAt), "dd-MM-yyyy, HH:mm")}</span>
                                       </div>
                                     ))}
                                   </div>

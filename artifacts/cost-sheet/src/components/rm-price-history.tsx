@@ -129,7 +129,7 @@ function RevisionDetail({ revision }: { revision: RmPriceRevision }) {
           <div>
             <p className="font-semibold">Revision #{revision.id}</p>
             <p className="text-xs text-muted-foreground">
-              Saved {format(new Date(revision.createdAt), "dd MMM yyyy, HH:mm")} by {revision.createdByName}
+              Saved {format(new Date(revision.createdAt), "dd-MM-yyyy, HH:mm")} by {revision.createdByName}
             </p>
           </div>
           <Badge variant="outline" className={revision.isWindowUnlocked ? "border-amber-500/30 text-amber-500" : ""}>
@@ -146,7 +146,7 @@ function RevisionDetail({ revision }: { revision: RmPriceRevision }) {
             {revision.offsetVersion ? (
               <p className="text-xs text-muted-foreground">
                 Offset revision #{revision.offsetVersion.id}, saved by {revision.offsetVersion.updatedByName} on{" "}
-                {format(new Date(revision.offsetVersion.updatedAt), "dd MMM yyyy, HH:mm")}.
+                {format(new Date(revision.offsetVersion.updatedAt), "dd-MM-yyyy, HH:mm")}.
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
@@ -220,7 +220,7 @@ export function RmPriceHistory({
                   <TableRow key={revision.id} className="border-border/40">
                     <TableCell className="pl-4 font-mono text-sm">#{revision.id}</TableCell>
                     <TableCell className="font-mono text-sm whitespace-nowrap">
-                      {format(new Date(revision.createdAt), "dd MMM yyyy, HH:mm")}
+                      {format(new Date(revision.createdAt), "dd-MM-yyyy, HH:mm")}
                     </TableCell>
                     <TableCell className="text-sm">{revision.createdByName}</TableCell>
                     <TableCell>

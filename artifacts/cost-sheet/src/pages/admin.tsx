@@ -268,7 +268,7 @@ function StructureDefaultsEditor({ structureName, dbRows, onSave, isSaving }: St
       <div className="flex items-center justify-between bg-muted/20 border-t border-border/40 px-4 py-2.5">
         {lastEdited ? (
           <span className="text-xs text-muted-foreground font-mono">
-            Last edited by {lastEdited.updatedByName} on {format(new Date(lastEdited.updatedAt), "dd MMM yyyy, HH:mm")}
+            Last edited by {lastEdited.updatedByName} on {format(new Date(lastEdited.updatedAt), "dd-MM-yyyy, HH:mm")}
           </span>
         ) : (
           <span className="text-xs text-muted-foreground italic">No overrides saved yet — using workbook defaults</span>
@@ -816,7 +816,7 @@ export default function Admin() {
                                   <TableCell className="text-sm text-muted-foreground">{q.structureType}</TableCell>
                                   <TableCell className="font-mono text-sm">Rev {q.revision}</TableCell>
                                   <TableCell className="pr-4 font-mono text-xs text-muted-foreground whitespace-nowrap">
-                                    {format(new Date(q.createdAt), 'dd MMM yyyy, HH:mm')}
+                                    {format(new Date(q.createdAt), 'dd-MM-yyyy, HH:mm')}
                                   </TableCell>
                                 </TableRow>
                               ))}

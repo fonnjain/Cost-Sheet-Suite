@@ -294,7 +294,7 @@ export function RmRatioEditor() {
               ) : (
                 history.map((h: any, i: number) => (
                   <TableRow key={i}>
-                    <TableCell className="pl-4 font-mono text-sm">{format(new Date(h.changedAt), "dd MMM yyyy, HH:mm")}</TableCell>
+                    <TableCell className="pl-4 font-mono text-sm">{format(new Date(h.changedAt), "dd-MM-yyyy, HH:mm")}</TableCell>
                     <TableCell className="text-sm">{h.structureName.trim()}</TableCell>
                     <TableCell className="font-mono text-xs">{h.kv}</TableCell>
                     <TableCell className="text-sm">{h.category}</TableCell>

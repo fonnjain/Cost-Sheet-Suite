@@ -256,7 +256,7 @@ export default function RmPrices() {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="text-sm font-mono bg-card px-3 py-1.5 rounded-md border border-border">
-            {format(today, "dd MMM yyyy")}
+            {format(today, "dd-MM-yyyy")}
           </div>
           <Button
             variant="outline"
@@ -453,7 +453,7 @@ export default function RmPrices() {
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4 text-sm">
             <div>
               <span className="text-muted-foreground">RM Date: </span>
-              <span className="font-mono">{computed.rm.rmDate}</span>
+              <span className="font-mono">{format(new Date(`${computed.rm.rmDate}T00:00:00`), "dd-MM-yyyy")}</span>
             </div>
             <div>
               <span className="text-muted-foreground">Zinc: </span>

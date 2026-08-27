@@ -92,7 +92,7 @@ function RmPriceSource({ quote }: { quote: Quote }) {
   if (!quote.rmPriceSource) return <span className="text-muted-foreground">—</span>;
   return (
     <span className="block text-xs leading-4 whitespace-nowrap">
-      <span className="font-medium">{format(new Date(quote.rmPriceSource.createdAt), "dd MMM yyyy")}</span>
+      <span className="font-medium">{format(new Date(quote.rmPriceSource.createdAt), "dd-MM-yyyy")}</span>
       <span className="block text-muted-foreground">by {quote.rmPriceSource.createdByName}</span>
     </span>
   );
@@ -343,7 +343,7 @@ export default function Review() {
         ? "No change"
         : `${d.priceDelta > 0 ? "+" : "-"}Rs ${stripRupee(formatINR(Math.abs(d.priceDelta)))} /MT`;
       return {
-        title: `Rev ${d.prev.revision} -> Rev ${d.quote.revision}  (${format(new Date(d.quote.createdAt), "dd MMM yyyy")}, ${d.quote.generatedByName})`,
+        title: `Rev ${d.prev.revision} -> Rev ${d.quote.revision}  (${format(new Date(d.quote.createdAt), "dd-MM-yyyy")}, ${d.quote.generatedByName})`,
         delta,
         rows,
       };
@@ -461,7 +461,7 @@ export default function Review() {
                   label={`Latest · Rev ${summary.latest.revision}`}
                   value={formatINR(summary.latest.quotePricePerMt)}
                   unit="/MT"
-                  sub={format(new Date(summary.latest.createdAt), "dd MMM yyyy")}
+                  sub={format(new Date(summary.latest.createdAt), "dd-MM-yyyy")}
                   accent
                 />
                 <KpiCard
@@ -530,7 +530,7 @@ export default function Review() {
                             <Badge variant="outline" className="font-mono bg-card">Rev {q.revision}</Badge>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                            {format(new Date(q.createdAt), "dd MMM yyyy")}
+                            {format(new Date(q.createdAt), "dd-MM-yyyy")}
                           </TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{q.generatedByName}</TableCell>
                           <TableCell><RmPriceSource quote={q} /></TableCell>
@@ -576,7 +576,7 @@ export default function Review() {
                   <span className="mr-auto text-xs text-muted-foreground">
                     Approved: Rev {approvedQuote.revision}
                     {approvedQuote.approvedByName ? ` by ${approvedQuote.approvedByName}` : ""}
-                    {approvedQuote.approvedAt ? ` on ${format(new Date(approvedQuote.approvedAt), "dd MMM yyyy")}` : ""}
+                    {approvedQuote.approvedAt ? ` on ${format(new Date(approvedQuote.approvedAt), "dd-MM-yyyy")}` : ""}
                   </span>
                 )}
                 <Button
@@ -707,7 +707,7 @@ export default function Review() {
                           <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
                           <Badge variant="outline" className="font-mono bg-card">Rev {d.quote.revision}</Badge>
                           <span className="text-xs text-muted-foreground ml-1">
-                            {format(new Date(d.quote.createdAt), "dd MMM yyyy")} · {d.quote.generatedByName}
+                            {format(new Date(d.quote.createdAt), "dd-MM-yyyy")} · {d.quote.generatedByName}
                           </span>
                         </div>
                         <DeltaBadge delta={d.priceDelta} />
@@ -832,7 +832,7 @@ export default function Review() {
                         <TableCell><RmPriceSource quote={quote} /></TableCell>
                         <TableCell className="text-sm">{quote.generatedByName}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          <div>{format(new Date(quote.createdAt), "dd MMM yyyy, HH:mm")}</div>
+                          <div>{format(new Date(quote.createdAt), "dd-MM-yyyy, HH:mm")}</div>
                           {quote.legacy && (
                             <div className="text-xs text-amber-400 mt-0.5" data-testid={`legacy-note-${quote.revision}`}>
                               Computed on previous logic (legacy)
