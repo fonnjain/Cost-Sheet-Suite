@@ -19,6 +19,7 @@ import { Unlock, Lock, Shield, Trash2, UserCog, FileText, ChevronDown, ChevronRi
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MASTER_SPECS } from "@/lib/v6/engine";
 import { RmPriceHistory } from "@/components/rm-price-history";
+import { UserUsageAudit } from "@/components/user-usage-audit";
 
 // ---------- Template Defaults Constants ----------
 
@@ -753,6 +754,8 @@ export default function Admin() {
           </CardContent>
         </Card>
       )}
+
+      <UserUsageAudit />
 
       <Card className="border-border/50">
         <CardHeader className="bg-card/50 border-b border-border/50">

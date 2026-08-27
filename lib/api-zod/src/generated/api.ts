@@ -101,6 +101,81 @@ export const GetUserActivityResponse = zod.array(GetUserActivityResponseItem)
 
 
 /**
+ * @summary Get date-filtered user usage audit (admin only)
+ */
+export const getUserUsageQueryFromRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getUserUsageQueryToRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const GetUserUsageQueryParams = zod.object({
+  "from": zod.coerce.string().regex(getUserUsageQueryFromRegExp).optional().describe('Inclusive calendar date, defaulting to 30 days ago'),
+  "to": zod.coerce.string().regex(getUserUsageQueryToRegExp).optional().describe('Inclusive calendar date, defaulting to today'),
+  "userId": zod.coerce.number().optional().describe('Limit results to one user')
+})
+
+export const getUserUsageResponseFromRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getUserUsageResponseToRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const GetUserUsageResponse = zod.object({
+  "from": zod.string().regex(getUserUsageResponseFromRegExp),
+  "to": zod.string().regex(getUserUsageResponseToRegExp),
+  "users": zod.array(zod.object({
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "email": zod.string(),
+  "sessionCount": zod.number(),
+  "activeSeconds": zod.number(),
+  "idleSeconds": zod.number(),
+  "lastActiveAt": zod.string().nullish(),
+  "pageVisitCount": zod.number(),
+  "uniquePageCount": zod.number(),
+  "quoteCount": zod.number(),
+  "totalCostGenerated": zod.number(),
+  "reportCount": zod.number(),
+  "pages": zod.array(zod.object({
+  "path": zod.string(),
+  "visits": zod.number(),
+  "firstVisitedAt": zod.string().optional(),
+  "lastVisitedAt": zod.string().optional()
+})),
+  "recentEvents": zod.array(zod.object({
+  "id": zod.number(),
+  "eventType": zod.string(),
+  "pagePath": zod.string().nullish(),
+  "activityState": zod.string().nullish(),
+  "durationSeconds": zod.number().nullish(),
+  "entityType": zod.string().nullish(),
+  "entityId": zod.string().nullish(),
+  "occurredAt": zod.string()
+}))
+}))
+})
+
+
+/**
+ * @summary Record a privacy-safe usage event for the current session
+ */
+export const recordUsageEventBodyPagePathMax = 120;
+
+export const recordUsageEventBodyEntityIdMax = 120;
+
+
+
+
+export const RecordUsageEventBody = zod.object({
+  "eventType": zod.enum(['page_view', 'heartbeat', 'report_export']),
+  "pagePath": zod.string().max(recordUsageEventBodyPagePathMax).nullish(),
+  "activityState": zod.union([zod.literal('active'),zod.literal('idle'),zod.literal(null)]).nullish(),
+  "entityType": zod.union([zod.literal('quote_revision_report'),zod.literal(null)]).nullish(),
+  "entityId": zod.string().max(recordUsageEventBodyEntityIdMax).nullish(),
+  "metadata": zod.object({
+  "revisionCount": zod.number().min(1).optional()
+}).nullish()
+})
+
+
+/**
  * @summary List all allowed users (admin only)
  */
 export const ListUsersResponseItem = zod.object({

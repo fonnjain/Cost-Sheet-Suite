@@ -9,6 +9,7 @@ import rmRatiosRouter from "./rm-ratios";
 import quotesRouter from "./quotes";
 import dashboardRouter from "./dashboard";
 import templateDefaultsRouter from "./template-defaults";
+import usageRouter from "./usage";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(rmRatiosRouter);
 router.use(quotesRouter);
 router.use(dashboardRouter);
 router.use(templateDefaultsRouter);
+router.use(usageRouter);
 
 export default router;

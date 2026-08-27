@@ -9,3 +9,5 @@ export * from "./quotes";
 export * from "./sessions";
 export * from "./template_defaults";
 export * from "./template_defaults_history";
+export * from "./usage_sessions";
+export * from "./user_audit_events";

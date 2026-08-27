@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable, { type RowInput, type CellHookData } from "jspdf-autotable";
 import { format } from "date-fns";
 import { formatINR } from "./costCalculator";
-import type { Quote } from "@workspace/api-client-react";
+import type { Quote, UserUsageResponse, UserUsageSummary } from "@workspace/api-client-react";
 
 const NAVY: [number, number, number] = [14, 31, 51];
 const RED: [number, number, number] = [230, 51, 41];
@@ -59,6 +59,22 @@ const MARGIN_LEVELS = [0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.1];
 
 function safeName(s: string): string {
   return s.replace(/[^A-Za-z0-9]/g, "_").replace(/_+/g, "_").slice(0, 30);
+}
+
+function duration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function usageEventLabel(event: UserUsageSummary["recentEvents"][number]): string {
+  if (event.eventType === "login") return "Signed in";
+  if (event.eventType === "logout") return "Signed out";
+  if (event.eventType === "page_view") return `Visited ${event.pagePath || "/"}`;
+  if (event.eventType === "quote_generated") return `Generated quote #${event.entityId || "—"}`;
+  if (event.eventType === "report_export") return "Downloaded quote revision PDF";
+  return event.eventType;
 }
 
 function header(doc: jsPDF, title: string, left: string[], right: string[]): number {
@@ -324,4 +340,154 @@ export function exportRevisionReportPdf(args: RevisionReportArgs): void {
 
   const stamp = format(new Date(), "yyMMdd_HHmm");
   doc.save(`RevisionReport_${safeName(args.customerName)}_${safeName(args.projectRef)}_${stamp}.pdf`);
+}
+
+export interface UserUsageReportPdfArgs {
+  data: UserUsageResponse;
+  userFilterLabel: string;
+}
+
+export function exportUserUsageReportPdf({ data, userFilterLabel }: UserUsageReportPdfArgs): void {
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const marginX = 32;
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const totalSessions = data.users.reduce((sum, user) => sum + user.sessionCount, 0);
+  const totalActive = data.users.reduce((sum, user) => sum + user.activeSeconds, 0);
+  const totalIdle = data.users.reduce((sum, user) => sum + user.idleSeconds, 0);
+  const totalPages = data.users.reduce((sum, user) => sum + user.pageVisitCount, 0);
+  const totalQuotes = data.users.reduce((sum, user) => sum + user.quoteCount, 0);
+  const totalCost = data.users.reduce((sum, user) => sum + user.totalCostGenerated, 0);
+  const totalReports = data.users.reduce((sum, user) => sum + user.reportCount, 0);
+  const rangeLabel = `${format(new Date(`${data.from}T00:00:00`), "dd MMM yyyy")} – ${format(new Date(`${data.to}T00:00:00`), "dd MMM yyyy")}`;
+
+  let y = header(
+    doc,
+    "User Usage & Activity Audit",
+    [`Date range: ${rangeLabel}`, `User filter: ${userFilterLabel}`],
+    [`Generated: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, `Users shown: ${data.users.length}`],
+  );
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...NAVY);
+  doc.text("Usage Summary", marginX, y);
+  doc.setTextColor(0);
+
+  autoTable(doc, {
+    startY: y + 6,
+    head: [["User", "Last active", "Sessions", "Active estimate", "Idle estimate", "Pages", "Cost sheets", "Generated cost (Rs)", "Reports"]],
+    body: [
+      ...data.users.map((user) => [
+        `${user.userName}\n${user.email}`,
+        user.lastActiveAt ? format(new Date(user.lastActiveAt), "dd MMM yyyy, HH:mm") : "No activity",
+        String(user.sessionCount),
+        duration(user.activeSeconds),
+        duration(user.idleSeconds),
+        `${user.pageVisitCount} / ${user.uniquePageCount}`,
+        String(user.quoteCount),
+        rs(user.totalCostGenerated),
+        String(user.reportCount),
+      ]),
+      [
+        "TOTAL",
+        "",
+        String(totalSessions),
+        duration(totalActive),
+        duration(totalIdle),
+        String(totalPages),
+        String(totalQuotes),
+        rs(totalCost),
+        String(totalReports),
+      ],
+    ],
+    theme: "grid",
+    styles: { fontSize: 8, cellPadding: 4, textColor: 30, lineColor: 222, lineWidth: 0.5, valign: "middle" },
+    headStyles: { fillColor: NAVY, textColor: 255, fontStyle: "bold" },
+    columnStyles: {
+      0: { cellWidth: 150 },
+      1: { cellWidth: 90 },
+      2: { halign: "right", cellWidth: 48 },
+      3: { halign: "right", cellWidth: 72 },
+      4: { halign: "right", cellWidth: 72 },
+      5: { halign: "right", cellWidth: 48 },
+      6: { halign: "right", cellWidth: 58 },
+      7: { halign: "right", cellWidth: 84 },
+      8: { halign: "right", cellWidth: 48 },
+    },
+    margin: { left: marginX, right: marginX },
+    // All summary columns have deliberate fixed widths (670pt total).
+    // Matching that width avoids AutoTable trying to expand a non-resizable table.
+    tableWidth: 670,
+    didParseCell: (cell) => {
+      if (cell.section === "body" && cell.row.index === data.users.length) {
+        cell.cell.styles.fontStyle = "bold";
+        cell.cell.styles.fillColor = TOTAL_BG;
+      }
+    },
+  });
+
+  doc.addPage();
+  y = 46;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(...NAVY);
+  doc.text("Pages Visited & Recent Events", marginX, y);
+  doc.setTextColor(0);
+  y += 22;
+
+  for (const user of data.users) {
+    if (y > pageH - 100) {
+      doc.addPage();
+      y = 46;
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...NAVY);
+    doc.text(`${user.userName} — ${user.email}`, marginX, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(90);
+    doc.text(`${duration(user.activeSeconds)} active · ${duration(user.idleSeconds)} idle · ${user.quoteCount} cost sheets · ${user.reportCount} reports`, marginX, y + 13);
+    doc.setTextColor(0);
+    y += 22;
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Page path", "Visits", "First visited", "Last visited"]],
+      body: user.pages.length
+        ? user.pages.map((page) => [
+            page.path,
+            String(page.visits),
+            page.firstVisitedAt ? format(new Date(page.firstVisitedAt), "dd MMM yyyy, HH:mm") : "—",
+            page.lastVisitedAt ? format(new Date(page.lastVisitedAt), "dd MMM yyyy, HH:mm") : "—",
+          ])
+        : [["No page visits recorded", "", "", ""]],
+      theme: "grid",
+      styles: { fontSize: 8, cellPadding: 3, textColor: 30, lineColor: 222, lineWidth: 0.5 },
+      headStyles: { fillColor: [90, 112, 138], textColor: 255, fontStyle: "bold" },
+      columnStyles: { 0: { cellWidth: 220 }, 1: { halign: "right", cellWidth: 55 } },
+      margin: { left: marginX, right: marginX },
+      tableWidth: pageW - 2 * marginX,
+    });
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Recent event", "Recorded at"]],
+      body: user.recentEvents.length
+        ? user.recentEvents.map((event) => [usageEventLabel(event), format(new Date(event.occurredAt), "dd MMM yyyy, HH:mm")])
+        : [["No usage events recorded", ""]],
+      theme: "grid",
+      styles: { fontSize: 8, cellPadding: 3, textColor: 30, lineColor: 222, lineWidth: 0.5 },
+      headStyles: { fillColor: [90, 112, 138], textColor: 255, fontStyle: "bold" },
+      columnStyles: { 1: { halign: "right", cellWidth: 130 } },
+      margin: { left: marginX, right: marginX },
+      tableWidth: pageW - 2 * marginX,
+    });
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 18;
+  }
+
+  const stamp = format(new Date(), "yyMMdd_HHmm");
+  doc.save(`UserUsageAudit_${data.from}_${data.to}_${safeName(userFilterLabel)}_${stamp}.pdf`);
 }

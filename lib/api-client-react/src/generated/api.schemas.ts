@@ -69,6 +69,113 @@ export interface UserActivity {
   quotes: UserActivityQuote[];
 }
 
+export type UsageEventInputEventType = typeof UsageEventInputEventType[keyof typeof UsageEventInputEventType];
+
+
+export const UsageEventInputEventType = {
+  page_view: 'page_view',
+  heartbeat: 'heartbeat',
+  report_export: 'report_export',
+} as const;
+
+/**
+ * @nullable
+ */
+export type UsageEventInputActivityState = typeof UsageEventInputActivityState[keyof typeof UsageEventInputActivityState] | null;
+
+
+export const UsageEventInputActivityState = {
+  active: 'active',
+  idle: 'idle',
+} as const;
+
+/**
+ * @nullable
+ */
+export type UsageEventInputEntityType = typeof UsageEventInputEntityType[keyof typeof UsageEventInputEntityType] | null;
+
+
+export const UsageEventInputEntityType = {
+  quote_revision_report: 'quote_revision_report',
+} as const;
+
+/**
+ * @nullable
+ */
+export type UsageEventInputMetadata = {
+  /** @minimum 1 */
+  revisionCount?: number;
+} | null;
+
+export interface UsageEventInput {
+  eventType: UsageEventInputEventType;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  pagePath?: string | null;
+  /** @nullable */
+  activityState?: UsageEventInputActivityState;
+  /** @nullable */
+  entityType?: UsageEventInputEntityType;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  entityId?: string | null;
+  /** @nullable */
+  metadata?: UsageEventInputMetadata;
+}
+
+export interface UserUsagePage {
+  path: string;
+  visits: number;
+  firstVisitedAt?: string;
+  lastVisitedAt?: string;
+}
+
+export interface UserUsageEvent {
+  id: number;
+  eventType: string;
+  /** @nullable */
+  pagePath?: string | null;
+  /** @nullable */
+  activityState?: string | null;
+  /** @nullable */
+  durationSeconds?: number | null;
+  /** @nullable */
+  entityType?: string | null;
+  /** @nullable */
+  entityId?: string | null;
+  occurredAt: string;
+}
+
+export interface UserUsageSummary {
+  userId: number;
+  userName: string;
+  email: string;
+  sessionCount: number;
+  activeSeconds: number;
+  idleSeconds: number;
+  /** @nullable */
+  lastActiveAt?: string | null;
+  pageVisitCount: number;
+  uniquePageCount: number;
+  quoteCount: number;
+  totalCostGenerated: number;
+  reportCount: number;
+  pages: UserUsagePage[];
+  recentEvents: UserUsageEvent[];
+}
+
+export interface UserUsageResponse {
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  from: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  to: string;
+  users: UserUsageSummary[];
+}
+
 export type UserInputRole = typeof UserInputRole[keyof typeof UserInputRole];
 
 
@@ -409,6 +516,23 @@ export interface UserQuoteCount {
   userName: string;
   count: number;
 }
+
+export type GetUserUsageParams = {
+/**
+ * Inclusive calendar date, defaulting to 30 days ago
+ * @pattern ^\d{4}-\d{2}-\d{2}$
+ */
+from?: string;
+/**
+ * Inclusive calendar date, defaulting to today
+ * @pattern ^\d{4}-\d{2}-\d{2}$
+ */
+to?: string;
+/**
+ * Limit results to one user
+ */
+userId?: number;
+};
 
 export type ListQuotesParams = {
 customerId?: number;

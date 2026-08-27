@@ -12,3 +12,4 @@
 - [Drizzle pg error codes](drizzle-pg-error-codes.md) — SQLSTATE (23505 etc.) is on err.cause.code, not err.code; check both when mapping DB errors to HTTP statuses.
 - [RM revision provenance](rm-revision-provenance.md) — price and offset revisions are retained audit records; quote links are nullable to preserve legacy values.
 - [Database-backed API tests](database-backed-api-tests.md) — use an explicit test connection and a disposable schema; never run mutating integration tests against the application default database.
+- [Usage audit privacy](usage-audit-privacy.md) — usage data is route/event and coarse heartbeat based; never broaden it into content or surveillance telemetry.

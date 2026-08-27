@@ -145,6 +145,77 @@ paths:
                 items:
                   $ref: "#/components/schemas/UserActivity"
 
+  /users/usage:
+    get:
+      operationId: getUserUsage
+      tags: [users]
+      summary: Get date-filtered user usage audit (admin only)
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: Inclusive calendar date, defaulting to 30 days ago
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: Inclusive calendar date, defaulting to today
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Limit results to one user
+      responses:
+        "200":
+          description: Usage summaries and event details grouped by user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserUsageResponse"
+        "400":
+          description: Invalid date range or user filter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /usage/events:
+    post:
+      operationId: recordUsageEvent
+      tags: [users]
+      summary: Record a privacy-safe usage event for the current session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsageEventInput"
+      responses:
+        "201":
+          description: Usage event accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Invalid usage event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /users:
     get:
       operationId: listUsers
@@ -822,6 +893,119 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UserActivityQuote"
+
+    UsageEventInput:
+      type: object
+      required: [eventType]
+      properties:
+        eventType:
+          type: string
+          enum: [page_view, heartbeat, report_export]
+        pagePath:
+          type: ["string", "null"]
+          maxLength: 120
+        activityState:
+          type: ["string", "null"]
+          enum: [active, idle, null]
+        entityType:
+          type: ["string", "null"]
+          enum: [quote_revision_report, null]
+        entityId:
+          type: ["string", "null"]
+          maxLength: 120
+        metadata:
+          type: ["object", "null"]
+          additionalProperties: false
+          properties:
+            revisionCount:
+              type: integer
+              minimum: 1
+
+    UserUsagePage:
+      type: object
+      required: [path, visits]
+      properties:
+        path:
+          type: string
+        visits:
+          type: integer
+        firstVisitedAt:
+          type: string
+        lastVisitedAt:
+          type: string
+
+    UserUsageEvent:
+      type: object
+      required: [id, eventType, occurredAt]
+      properties:
+        id:
+          type: integer
+        eventType:
+          type: string
+        pagePath:
+          type: ["string", "null"]
+        activityState:
+          type: ["string", "null"]
+        durationSeconds:
+          type: ["integer", "null"]
+        entityType:
+          type: ["string", "null"]
+        entityId:
+          type: ["string", "null"]
+        occurredAt:
+          type: string
+
+    UserUsageSummary:
+      type: object
+      required: [userId, userName, email, sessionCount, activeSeconds, idleSeconds, pageVisitCount, uniquePageCount, quoteCount, totalCostGenerated, reportCount, pages, recentEvents]
+      properties:
+        userId:
+          type: integer
+        userName:
+          type: string
+        email:
+          type: string
+        sessionCount:
+          type: integer
+        activeSeconds:
+          type: integer
+        idleSeconds:
+          type: integer
+        lastActiveAt:
+          type: ["string", "null"]
+        pageVisitCount:
+          type: integer
+        uniquePageCount:
+          type: integer
+        quoteCount:
+          type: integer
+        totalCostGenerated:
+          type: number
+        reportCount:
+          type: integer
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserUsagePage"
+        recentEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserUsageEvent"
+
+    UserUsageResponse:
+      type: object
+      required: [from, to, users]
+      properties:
+        from:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+        to:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserUsageSummary"
 
     UserInput:
       type: object

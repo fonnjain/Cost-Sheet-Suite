@@ -6,6 +6,8 @@ import { db } from "@workspace/db";
 import { usersTable, sessionsTable } from "@workspace/db/schema";
 import { LoginBody, ChangePasswordBody, GetMeResponse } from "@workspace/api-zod";
 import { requireAuth, extractToken } from "../middlewares/auth";
+import { createUsageSession, endUsageSession, recordAuditEvent } from "../lib/usage-audit";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -48,6 +50,13 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   await db.insert(sessionsTable).values({ token, userId: user.id, expiresAt });
+  // Audit failures must never prevent a verified user from signing in.
+  try {
+    const usageSession = await createUsageSession(token, user.id);
+    await recordAuditEvent({ userId: user.id, actorName: user.name, sessionId: usageSession.id, eventType: "login" });
+  } catch (err) {
+    logger.error({ err, userId: user.id }, "Unable to start usage audit session");
+  }
 
   res.json({
     user: {
@@ -112,6 +121,14 @@ router.post("/auth/change-password", requireAuth, async (req, res): Promise<void
 });
 
 router.post("/auth/logout", requireAuth, async (req, res): Promise<void> => {
+  if (req.usageSessionId != null) {
+    try {
+      await recordAuditEvent({ userId: req.userId!, actorName: req.userName ?? "Unknown", sessionId: req.usageSessionId, eventType: "logout" });
+      await endUsageSession(req.usageSessionId);
+    } catch (err) {
+      logger.error({ err, userId: req.userId }, "Unable to close usage audit session");
+    }
+  }
   const token = extractToken(req);
   if (token) {
     await db.delete(sessionsTable).where(eq(sessionsTable.token, token));

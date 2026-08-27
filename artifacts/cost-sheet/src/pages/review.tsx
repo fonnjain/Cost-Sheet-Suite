@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useListCustomers, useGetProjectsByCustomer, useGetQuotesByProject, useApproveQuote, type Quote } from "@workspace/api-client-react";
+import { useListCustomers, useGetProjectsByCustomer, useGetQuotesByProject, useApproveQuote, useRecordUsageEvent, type Quote } from "@workspace/api-client-react";
 import { getGetProjectsByCustomerQueryKey, getGetQuotesByProjectQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -266,6 +266,7 @@ export default function Review() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const approveQuote = useApproveQuote();
+  const recordUsageEvent = useRecordUsageEvent();
 
   // Currently approved revision (if any) drives the checkbox state.
   const approvedQuote = useMemo(() => sortedQuotes.find((q) => q.approved) ?? null, [sortedQuotes]);
@@ -356,6 +357,15 @@ export default function Review() {
       lineItemsBody,
       changedMatrix,
       diffSections,
+    });
+    // Retain only the report type and opaque project reference — never the report contents.
+    recordUsageEvent.mutate({
+      data: {
+        eventType: "report_export",
+        entityType: "quote_revision_report",
+        entityId: `${customerId}:${selectedProject}`.slice(0, 120),
+        metadata: { revisionCount: sortedQuotes.length },
+      },
     });
   }
 

@@ -3,6 +3,8 @@ import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { quotesTable, rmOffsetsTable, rmPricesTable } from "@workspace/db/schema";
 import { requireAuth } from "../middlewares/auth";
+import { recordRequestAuditEvent } from "../lib/usage-audit";
+import { logger } from "../lib/logger";
 import {
   CreateQuoteBody,
   GetQuoteParams,
@@ -198,6 +200,17 @@ router.post("/quotes", requireAuth, async (req, res): Promise<void> => {
         : null,
     })
     .returning();
+
+  // A completed quote must not look failed just because analytics is unavailable.
+  try {
+    await recordRequestAuditEvent(req, {
+      eventType: "quote_generated",
+      entityType: "quote",
+      entityId: String(quote.id),
+    });
+  } catch (err) {
+    logger.error({ err, quoteId: quote.id, userId: req.userId }, "Unable to record quote usage audit event");
+  }
 
   res.status(201).json(formatQuote(quote, sources));
 });

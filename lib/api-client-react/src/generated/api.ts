@@ -29,6 +29,7 @@ import type {
   ErrorResponse,
   GetProjectsByCustomerParams,
   GetQuotesByProjectParams,
+  GetUserUsageParams,
   HealthStatus,
   ListQuotesParams,
   LoginInput,
@@ -46,11 +47,13 @@ import type {
   TemplateDefault,
   TemplateDefaultsHistoryEntry,
   TemplateDefaultsInput,
+  UsageEventInput,
   User,
   UserActivity,
   UserInput,
   UserQuoteCount,
   UserUpdate,
+  UserUsageResponse,
   WindowToggleInput
 } from './api.schemas';
 
@@ -508,6 +511,161 @@ export function useGetUserActivity<TData = Awaited<ReturnType<typeof getUserActi
 
 
 
+
+export const getGetUserUsageUrl = (params?: GetUserUsageParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/users/usage?${stringifiedParams}` : `/api/users/usage`
+}
+
+/**
+ * @summary Get date-filtered user usage audit (admin only)
+ */
+export const getUserUsage = async (params?: GetUserUsageParams, options?: RequestInit): Promise<UserUsageResponse> => {
+
+  return customFetch<UserUsageResponse>(getGetUserUsageUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUserUsageQueryKey = (params?: GetUserUsageParams,) => {
+    return [
+    `/api/users/usage`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetUserUsageQueryOptions = <TData = Awaited<ReturnType<typeof getUserUsage>>, TError = ErrorType<ErrorResponse>>(params?: GetUserUsageParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserUsage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUserUsageQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserUsage>>> = ({ signal }) => getUserUsage(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserUsage>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUserUsageQueryResult = NonNullable<Awaited<ReturnType<typeof getUserUsage>>>
+export type GetUserUsageQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get date-filtered user usage audit (admin only)
+ */
+
+export function useGetUserUsage<TData = Awaited<ReturnType<typeof getUserUsage>>, TError = ErrorType<ErrorResponse>>(
+ params?: GetUserUsageParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserUsage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUserUsageQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getRecordUsageEventUrl = () => {
+
+
+
+
+  return `/api/usage/events`
+}
+
+/**
+ * @summary Record a privacy-safe usage event for the current session
+ */
+export const recordUsageEvent = async (usageEventInput: UsageEventInput, options?: RequestInit): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getRecordUsageEventUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      usageEventInput,)
+  }
+);}
+
+
+
+
+export const getRecordUsageEventMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordUsageEvent>>, TError,{data: BodyType<UsageEventInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordUsageEvent>>, TError,{data: BodyType<UsageEventInput>}, TContext> => {
+
+const mutationKey = ['recordUsageEvent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordUsageEvent>>, {data: BodyType<UsageEventInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  recordUsageEvent(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordUsageEventMutationResult = NonNullable<Awaited<ReturnType<typeof recordUsageEvent>>>
+    export type RecordUsageEventMutationBody = BodyType<UsageEventInput>
+    export type RecordUsageEventMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Record a privacy-safe usage event for the current session
+ */
+export const useRecordUsageEvent = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordUsageEvent>>, TError,{data: BodyType<UsageEventInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordUsageEvent>>,
+        TError,
+        {data: BodyType<UsageEventInput>},
+        TContext
+      > => {
+      return useMutation(getRecordUsageEventMutationOptions(options));
+    }
 
 export const getListUsersUrl = () => {
 
